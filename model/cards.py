@@ -63,50 +63,43 @@ def get_sigil_data(config, csv_dict):
     mox_provided = []
     token_id = 0
 
-    def handle_sigil_or_trait(att_list, att_dict, tokens):
+    def handle_sigil_or_trait(sigil, att_list, att_dict):
         nonlocal token_id, power_sigil, health_sigil, conduit_sigil
-        result = None
+        item = None
         conditionals = SigilConditional.get_all_subclasses()
-        while len(conditionals) > 0 and not result:
-            result = conditionals.pop().handle_sigil_entry(config, sigil)
-        if result:
-            att_list.append(result)
-            if result.sigil:
-                for _ in range(result.sigil.token_needed):
-                    result.sigil.addToken(tokens[token_id % len(tokens)])
-                    token_id += 1
-                for tag in result.sigil.tags.split(','):
-                    if "power_sigil" in tag:
-                        power_sigil = result.sigil.sigilImage()
-                    if "health_sigil" in tag:
-                        health_sigil = result.sigil.sigilImage()
-                    if "conduit_sigil" in tag:
-                        conduit_sigil = result.sigil.name.replace(" ", "")
-                    if "mox_" in tag:
-                        mox_provided.append(tag)
+        while conditionals and not item:
+            item = conditionals.pop().handle_sigil_entry(config, sigil)
+        if item:
+            target_obj = getattr(item, 'sigil', None)
         elif sigil in att_dict:
-            elt = att_dict[sigil].copy()
-            att_list.append(elt)
-            for _ in range(elt.token_needed):
-                elt.addToken(tokens[token_id % len(tokens)])
-                token_id += 1
-            for tag in elt.tags.split(','):
+            item = att_dict[sigil].copy()
+            target_obj = item
+        else:
+            return 
+
+        att_list.append(item)
+        if target_obj:
+            if str_tokens:
+                for _ in range(target_obj.token_needed):
+                    target_obj.addToken(str_tokens[token_id % len(str_tokens)])
+                    token_id += 1
+            for tag in target_obj.tags.split(','):
                 if "power_sigil" in tag:
-                    power_sigil = elt.sigilImage()
-                if "health_sigil" in tag:
-                    health_sigil = elt.sigilImage()
-                if "conduit_sigil" in tag:
-                    conduit_sigil = elt.name.replace(" ", "")
-                if "mox_" in tag:
+                    power_sigil = target_obj.sigilImage()
+                elif "health_sigil" in tag:
+                    health_sigil = target_obj.sigilImage()
+                elif "conduit_sigil" in tag:
+                    conduit_sigil = target_obj.name.replace(" ", "")
+                elif "mox_" in tag:
                     mox_provided.append(tag)
 
     sigil_list = []
     trait_list = []
     try:
         for sigil in str_sigils:
-            handle_sigil_or_trait(sigil_list, sigils.SIGILS, str_tokens)
+            handle_sigil_or_trait(sigil, sigil_list, sigils.SIGILS)
         for sigil in str_traits:
-            handle_sigil_or_trait(trait_list, sigils.TRAITS, str_tokens)
+            handle_sigil_or_trait(sigil, trait_list, sigils.TRAITS)
         return sigil_list, trait_list, power_sigil, health_sigil, conduit_sigil, mox_provided
     except KeyError as e:
         print(f"Error: {e}")
