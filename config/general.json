@@ -1,0 +1,150 @@
+{
+    "assets_dir": "assets",
+    "cards_file_path": "data/cards.csv",
+    "sigils_file_path": "data/sigils.csv",
+    "traits_file_path": "data/traits.csv",
+    
+    "write_art_credit": true,
+    "write_card_metadata": true,
+    "show_power_sigil": true,
+    "show_health_sigil": true,
+    "show_conduit_sigil_indicators": true,
+    "center_card_name": true,
+    "traits_at_bottom": true,
+    "allow_card_bottom_removal": true,
+    "allow_default_formatting": true,
+    "allow_shortened_formatting": true,
+    "allow_base_game_display": true,
+
+    "export_sorted_by_folder": true,
+    "export_color": [0, 0, 0],
+    "export_normal_formatting": true,
+    "export_shorter_formatting": false,
+    "export_base_game_formatting": false,
+    "export_sigil_patches": false,
+    "export_sigil_description_icon": false,
+    "export_trait_description_icon": false,
+    "exported_traitline": true,
+    
+    "font": "heavyweight",
+    "default_tier": "common",
+    "name_font_size": 110,
+    "name_max_width": 870,
+    "flavor_text_font_size": 45,
+    "flavor_text_max_width": 700,
+    "metadata_font_size": 45,
+    "art_credit_font_size": 45,
+    "sigil_name_font_size": 55,
+    "sigil_description_font_size": 45,
+    "trait_description_font_size": 40,
+    "sigil_description_icon_size": 40,
+    "trait_description_icon_size": 35,
+    "stats_font_size": 110,
+    "gemification_font_size": 80,
+    "arcane_font_size": 43,
+    "tribal_font_size": 43,
+
+    "flavor_text_color_index": 6,
+    "metadata_color_index": 6,
+    "art_credit_color_index": 6,
+    "trait_color_index": 6,
+    
+    "arcane_dark_color_index": 6,
+    "arcane_light_color_index": 5,
+    "tribal_dark_color_index": 6,
+    "tribal_light_color_index": 5,
+
+    "sigil_img_scale": 100,
+    "allow_colored_sigils": true,
+    "sigil_img_space": 180,
+    "sigil_space": 880,
+
+    "sigil_vertical_spacing": 5,
+    "traitline_vertical_spacing": 6,
+    "trait_vertical_spacing": 0,
+
+    "cost_right_border": 99,
+    "cost_right_border_gemification_displacement": 2,
+    "cost_left_border": 67,
+    "cost_bottom_border": 91,
+
+    "name_top_border": 138,
+    "name_left_border": 138,
+    "metadata_top_border": 15,
+    "art_credit_top_border": 1510,
+    
+    "indicator_displacement": 15,
+
+    "flavor_text_top_border": 962,
+    "flavor_text_left_border": 300,
+    "sigil_top_border": 1010,
+    "sigil_left_border": 120,
+    "sigil_bottom_border": 1430,
+    
+    "power_sigil_center": [220, 925],
+    "health_sigil_center": [915, 265],
+    "power_coord": [198, 885],
+    "health_coord": [895, 225],
+
+    "gemification_health_top_border": 17,
+    "gemification_health_horizontal_center": 101,
+    "gemification_health_text_top_border": 105,
+    "gemification_health_text_horizontal_center": 1015,
+
+    "gemification_power_bottom_border": 87,
+    "gemification_power_horizontal_center": 9,
+    "gemification_power_text_top_border": 865,
+    "gemification_power_text_horizontal_center": 95,
+
+    "gemification_cost_bottom_border": 84,
+    "gemification_cost_horizontal_center": 103,
+    "gemification_cost_text_top_border": 835,
+    "gemification_cost_text_horizontal_center": 1035,
+
+    "gemification_sigil_top_displacement": 0,
+    "gemification_sigil_bottom_displacement": 0,
+    "gemification_sigil_gems_right_border": 14,
+    "gemification_sigil_small_max_height": 150,
+    "gemification_sigil_medium_max_height": 200,
+
+    "cell_sigil_top_displacement": 0,
+    "cell_sigil_bottom_displacement": 0,
+    "cell_sigil_small_max_height": 150,
+    "cell_sigil_medium_max_height": 200,
+
+    "latch_sigil_top_displacement": 0,
+    "latch_sigil_bottom_displacement": 0,
+    "left_latch_head_border": 110,
+    "right_latch_head_border": 1010,
+    "latch_sigil_small_max_height": 150,
+    "latch_sigil_medium_max_height": 200,
+
+    "arcane_sigil_top_displacement": 10,
+    "arcane_sigil_bottom_displacement": 95,
+    "arcane_text": "If you provide 2 mox colors:",
+    "arcane_text_y": 20,
+
+    "tribal_sigil_top_displacement": 20,
+    "tribal_sigil_bottom_displacement": 95,
+    "tribal_text": "If this card shares a tribe with another:",
+    "tribal_text_y": 30,
+
+
+    "overrides": {
+        "default": {
+            "uncommon": {
+                "sigil_bottom_border": 1440
+            }
+        },
+        "bloodless": {
+            "default": {
+                "sigil_bottom_border": 1440,
+                "power_sigil_center": [215, 930],
+                "power_coord": [193, 885]
+            },
+            "uncommon": {
+                "sigil_bottom_border": 1450
+            }
+        }
+    }
+}

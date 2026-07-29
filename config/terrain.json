@@ -1,0 +1,12 @@
+{
+    "sigil_bottom_border": 1440,
+    "power_sigil_center": [215, 930],
+    "power_coord": [193, 885],
+    "overrides": {
+        "default": {
+            "uncommon": {
+                "sigil_bottom_border": 1450
+            }
+        }
+    }
+}

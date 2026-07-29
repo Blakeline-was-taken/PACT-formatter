@@ -1,0 +1,9 @@
+{
+    "overrides": {
+        "default": {
+            "rare": {
+                "sigil_bottom_border": 1425
+            }
+        }
+    }
+}
