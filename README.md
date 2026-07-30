@@ -86,7 +86,7 @@ Each of these data sheets have their structure detailed later down in this docum
 
 ## 2. Running the Generator
 
-The formatter features an command-line interface that lets you render your entire library or pinpoint specific items.
+The formatter features an command-line interface that can render the entire library or pinpoint specific items.
 
 1. **Launch the Main Script:** Open a terminal in the root directory of the project and run the main entry point:
 

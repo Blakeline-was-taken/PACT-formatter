@@ -1,6 +1,6 @@
 Card Name,Art File,Temple,Tier,Cost,Power,Health,Sigils,Token,Traits,Tribes,Flavor Text,Credit,Tags
 Gemification,Gemification.png,Magick,Common,PRISM_-2_3 bones,orange_+1_1,green_+2_1,"GREEN_BLUE_Piercing, Gem Dependent",,,Test Mage,"Oooh, shiny !",NEWS,
-Bee,Bee.png,Beast,Side Deck,free,1,1,"Airborne, Brittle",,,Insect,Unassuming but determined pests.,Pixel Profligate,gemified_vanila
+Bee,Bee.png,Beast,Side Deck,free,1,1,"Airborne, Brittle",,,Insect,Unassuming but determined pests.,Pixel Profligate,
 Krill,Krill.png,Beast,Side Deck,free,0,1,Waterborne,,,Fish,One in a krillion.,Murigen,
 Squirrel,Squirrel.png,Beast,Side Deck,free,0,1,,,,Vermin,"Small, frail, but ever so useful.",Pixel Profligate,
 Beehive,Beehive.png,Beast,Common,free,0,3,Bees Within,Bee,Bloodless,Insect,"Nonthreatening, if you leave it be.",Pixel Profligate,bloodless_bg
