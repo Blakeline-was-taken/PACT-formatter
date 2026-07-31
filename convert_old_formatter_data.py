@@ -76,7 +76,7 @@ with open(input_file_traits, mode='r', encoding='utf-8') as infile:
         for row in reader:
             tags = []
             # Update the icons
-            row["Description"] = row["Description"].replace("["; "{").replace("]", "}")
+            row["Description"] = row["Description"].replace("[", "{").replace("]", "}")
             # Check Is_attack_sigil (if filled, add power_sigil)
             if row['Is_attack_sigil'] and row['Is_attack_sigil'].strip():
                 tags.append('power_sigil')
