@@ -40,7 +40,7 @@ with open(input_file_sigils, mode='r', encoding='utf-8') as infile:
         for row in reader:
             tags = []
             # Update the icons
-            row["Description"] = row["Description"].replace("["; "{").replace("]", "}")
+            row["Description"] = row["Description"].replace("[", "{").replace("]", "}")
             # Check Can_be_colored (if empty, add has_color)
             if row['Can_be_colored'] and not row['Can_be_colored'].strip():
                 tags.append('has_color')
