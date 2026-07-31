@@ -18,13 +18,13 @@ with open(input_file_cards, mode='r', encoding='utf-8') as infile:
     fieldnames = reader.fieldnames
     new_fieldnames = fieldnames[:1] + ['Art File'] + fieldnames[1:] + ['Tags']
     with open(output_file_cards, mode='w', encoding='utf-8', newline='') as outfile:
-        writer = csv.DictWriter(outfile, fieldnames=new_fieldnames)
+        writer = csv.DictWriter(outfile, fieldnames=new_fieldnames, extrasaction='ignore')
         writer.writeheader()
         for row in reader:
             # Generate the new column value
             row['Art File'] = generate_filename(row['Card Name'])
             tags = []
-            if "Bloodless" in row["Sigils"] + row["Traits"]:
+            if row["Sigils"] and row["Traits"] and "Bloodless" in row["Sigils"] + row["Traits"]:
                 tags.append("bloodless_bg")
             row["Tags"] = ', '.join(tags)
             writer.writerow(row)
