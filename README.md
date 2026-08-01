@@ -26,13 +26,13 @@ pip install Pillow tqdm
 If you have a collection of cards created in the older version of the formatter, follow these steps to migrate your assets and data sheets to the new system.
 
 1. **Move Assets:** Take your old `card_art` and `sigils` folders and place them inside the new `assets/general_assets/` directory.
-2. **Place the Old Data Sheets (say that again?):** Grab your old `cards.csv`, `sigils.csv`, and `traits.csv` files and place them directly in the main root folder (where the python scripts live).
+2. **Place the Old Data Sheets (say that again?):** Grab your old `cards.csv`, `sigils.csv`, and `traits.csv` files and place them in the `data/` folder (replacing the files inside).
 3. **Run the Converter:** Open the terminal or command prompt in that folder and run the conversion script by typing:
 ```bash
 python convert_old_formatter_data.py
 ```
 
-4. **Clean Up and Rename:** The script will create three new files in the main directory. Move these files into the `data/` folder and rename them to remove the `updated_` prefix so the application can read them:
+4. **Clean Up and Rename:** The script will create three new files in the main directory. Delete your old files (or back them up) and rename the new ones to remove the `updated_` prefix so the application can read them:
 * Rename `updated_cards.csv` to **`cards.csv`**
 * Rename `updated_sigils.csv` to **`sigils.csv`**
 * Rename `updated_traits.csv` to **`traits.csv`**
@@ -92,7 +92,6 @@ The formatter features an command-line interface that can render the entire libr
 
 ```bash
 python main.py
-
 ```
 
 2. **Select Asset Type:** The CLI will prompt you to select what you want to render. Enter the corresponding number:
@@ -273,7 +272,6 @@ The `overrides` block specifies custom properties that automatically trigger bas
         }
     }
 }
-
 ```
 
 When generating a card, the system resolves its configuration by applying settings in a strict order of priority:
@@ -326,3 +324,39 @@ Just like image assets, these color sheets can be specialized. The system search
 2. `assets/beast/rare_colors.png` *(Temple + Tier)*
 3. `assets/beast/bloodless_colors.png` *(Temple + Modifier)*
 4. `assets/beast/colors.png` *(Temple)*
+
+---
+
+# Adding Custom Temples & Tiers
+
+Adding a custom temple or tier is as simple as providing the assets for them. 
+
+## Creating a Custom Temple
+
+A **Temple** represents the core visual theme of a card (like Beast, Undead, Tech, or Magick). Creating a new one means adding custom assets and text colors into their own dedicated space.
+
+1. **Create a new folder:** Navigate to the `assets/` directory and create a brand-new folder named after the temple. Ensure the folder name is entirely lowercase (e.g., `assets/alchemy`).
+2. **Establish the color scheme:** Copy a `colors.png` file from an existing temple folder and paste it into the new folder. Open it in any image editor to change the pixel blocks to match the new theme's text and outline colors.
+3. **Add unique assets:** Whenever this new theme requires a unique card template, drop it directly into this new folder. This will usually include stuff like backgrounds (e.g. `common_bg.png`), colors (e.g. `rare_colors.png`) and extra bits and pieces (e.g. `TRIBAL.png`). The formatter will automatically use these instead of the global versions.
+4. **Apply it to cards:** Open `cards.csv` and type the exact name of this new folder (e.g., `Alchemy`) into the `Temple` column for any card that wants to use this temple.
+
+---
+
+### Creating a Custom Tier
+
+Adding a new **Tier** is slightly more complicated, as tiers can be used by multiple temples. They can change a lot about how the card looks, like background graphics, colors, text spacing, etc.
+
+1. **Define the tier name:** Choose a name for this new rarity tier (e.g., `Mythical`).
+2. **Create tier-prefixed graphics:** Since tiers are meant to change the look of the card, it will need new images prefixed with its name. For example, dropping `mythical_bg.png` into `general_assets/` will create a generalized background for that tier. Usually this will also require creating temple-based variants of that asset to put into every temple asset folder, mostly because of the power graphic on backgrounds.
+3. **Add spacing overrides (Optional):** If this custom tier requires shifting text around, open `general.json`, scroll down to the `"overrides"` section and add the new tier to customize its layout boundaries:
+```json
+"overrides": {
+    "default": {
+        "mythical": {
+            "sigil_bottom_border": 1350,
+            "flavor_text_top_border": 1100
+        }
+    }
+}
+```
+4. **Assign it in data sheets:** Open `cards.csv` and type the new tier name directly into the `Tier` column for cards that want to use it.
