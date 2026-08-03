@@ -155,18 +155,6 @@ def print_stat_gemification_indicators(config, image, csv_dict, bg_modifier=None
         image.paste(gem_image, (gem_x, gem_y), gem_image)
 
 
-def print_extra_cell_indicators(config, image, csv_dict, bg_modifier=None):
-    for tag in csv_dict["Tags"].split(","):
-        if "extra_cell" in tag.strip():
-            cells = int(tag.strip().split("_")[0])
-            cell_y = 26
-            cell_image = get_card_asset("extra_cell", "extras/indicators", csv_dict["Temple"], csv_dict["Tier"], bg_modifier)
-            for _ in range(cells):
-                image.paste(cell_image, (3, cell_y), cell_image)
-                cell_y += cell_image.height - 1
-            return
-
-
 def print_card_cost(config, image, csv_dict):
     if csv_dict['Cost'].upper() in ['NONE', '', 'FREE', None]:
         return
@@ -188,6 +176,33 @@ def print_card_cost(config, image, csv_dict):
             cost_y -= cost_img.height + 1
         image.paste(cost_img, (cost_x - cost_img.width, cost_y), cost_img)
         cost_x -= cost_img.width + 1
+
+
+def print_extra_cell_indicators(config, image, csv_dict, bg_modifier=None):
+    for tag in csv_dict["Tags"].split(","):
+        if "extra_cell" in tag.strip():
+            cells = int(tag.strip().split("_")[0])
+            cell_y = config['extra_cells_top_border']
+            cell_image = get_card_asset("extra_cell", "extras/indicators", csv_dict["Temple"], csv_dict["Tier"], bg_modifier)
+            for _ in range(cells):
+                image.paste(cell_image, (config['extra_cells_left_border'], cell_y), cell_image)
+                cell_y += cell_image.height - 1
+            return
+
+
+def print_tribes(config, image, csv_dict, bg_modifier=None):
+    if csv_dict["Tribes"] and config['display_tribe_icons']:
+        pos_y = config['tribes_top_border']
+        for tribe in csv_dict["Tribes"].split(" "):
+            if tribe:
+                icon_path = f"assets/general_assets/tribes/{tribe.lower()}.png"
+                if path.exists(icon_path):
+                    tribe_icon = apply_temple_colors(Image.open(icon_path), csv_dict["Temple"], csv_dict["Tier"], bg_modifier)
+                else:
+                    tribe_icon = apply_temple_colors(Image.open("assets/general_assets/tribes/_placeholder_.png"), csv_dict["Temple"], csv_dict["Tier"], bg_modifier)
+                tribe_icon = tribe_icon.resize((tribe_icon.width * 5, tribe_icon.height * 5), Image.NEAREST)
+                image.paste(tribe_icon, (config['tribes_left_border'], pos_y), tribe_icon)
+                pos_y += tribe_icon.height - 5
 
 
 def paste_sigil(image, sigil_img, box):
@@ -649,6 +664,9 @@ def create_card(csv_dict):
     # Resize the card
     # ----------------------------------------------------
     image = image.resize((image.width * 10, image.height * 10), Image.NEAREST)
+
+    # Add tribe icons
+    print_tribes(config, image, csv_dict, bg_modifier)
 
     # TODO: Temple/rarity-based values
     draw = ImageDraw.Draw(image)

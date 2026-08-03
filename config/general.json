@@ -9,6 +9,7 @@
     "show_power_sigil": true,
     "show_health_sigil": true,
     "show_conduit_sigil_indicators": true,
+    "display_tribe_icons": true,
     "center_card_name": true,
     "traits_at_bottom": true,
     "allow_card_bottom_removal": true,
@@ -128,6 +129,12 @@
     "tribal_sigil_bottom_displacement": 95,
     "tribal_text": "If this card shares a tribe with another:",
     "tribal_text_y": 30,
+
+    "extra_cells_top_border": 26,
+    "extra_cells_left_border": 3,
+
+    "tribes_top_border": 265,
+    "tribes_left_border": 980,
 
 
     "overrides": {
