@@ -170,10 +170,13 @@ def print_card_cost(config, image, csv_dict):
         cost_images.append(apply_temple_colors(cost.getCostImage(), csv_dict['Temple'], csv_dict['Tier']))
 
     cost_y = config['cost_bottom_border'] - cost_images[0].height
+    height_to_skip = 0
     for cost_img in cost_images:
-        if cost_x - cost_img.width < config['cost_left_border']:
+        if cost_x - cost_img.width < config['cost_left_border'] and height_to_skip > 0:
             cost_x = config['cost_right_border']
-            cost_y -= cost_img.height + 1
+            cost_y -= height_to_skip + 1
+            height_to_skip = 0
+        height_to_skip = max(height_to_skip, cost_img.height)
         image.paste(cost_img, (cost_x - cost_img.width, cost_y), cost_img)
         cost_x -= cost_img.width + 1
 
