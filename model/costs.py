@@ -152,13 +152,13 @@ class Energy(Cost):
         return Energy(self.current_energy - other.current_energy, self.max_energy - other.max_energy)
 
     def getCostImage(self) -> Image:
-        cost_image = None
         first_cell = Image.open("assets/general_assets/costs/energy/cell_first.png").convert("RGBA")
-        cell = Image.open(f"assets/general_assets/costs/energy/cell.png").convert("RGBA")
+        cell = Image.open("assets/general_assets/costs/energy/cell.png").convert("RGBA")
         energy = Image.open("assets/general_assets/costs/energy/energy.png").convert("RGBA")
         max_energy = Image.open("assets/general_assets/costs/energy/overcharge.png").convert("RGBA")
-        
-        if (self.current_energy + self.max_energy) <= 6: # Use the energy bar
+
+        # Path 1: Full energy bar (total energy <= 6)
+        if (self.current_energy + self.max_energy) <= 6:
             cost_image = Image.new("RGBA", (26, 9))
             cost_image.paste(first_cell, (0, 0))
             for i in range(6, 23, 4):
@@ -169,78 +169,70 @@ class Energy(Cost):
 
             for i in range(2 + 4 * (6 - self.max_energy - self.current_energy), 23 - 4 * self.max_energy, 4):
                 cost_image.paste(energy, (i, 2))
-        
-        else: # Use energy numbers
-            cost_image = None
 
-            if self.current_energy > 0:
-                if self.current_energy > 6:
-                    digits = list(str(self.current_energy))
-                    digits.reverse() # We reverse here so that the cells print properly
-                    energy_img = Image.new("RGBA", (10 + 4 * len(digits), 9))
-                    for i, digit in enumerate(digits):
-                        cell_x = 4 * (len(digits)-1-i)
-                        energy_img.paste(first_cell, (cell_x, 0))
-                        digit_img = Image.open(f"assets/general_assets/costs/energy/{digit}.png").convert("RGBA")
-                        energy_img.paste(digit_img, (cell_x + 2, 2), digit_img)
-                    
-                    x_img = Image.open(f"assets/general_assets/costs/energy/x.png").convert("RGBA")
-                    energy_img.paste(cell, (energy_img.width - 8, 0), cell)
-                    energy_img.paste(x_img, (energy_img.width - 8, 2), x_img)
-                    energy_img.paste(cell, (energy_img.width - 4, 0), cell)
-                    energy_img.paste(energy, (energy_img.width - 4, 2), energy)
-                else:
-                    energy_img = Image.new("RGBA", (2 + 4 * self.current_energy, 9))
-                    energy_img.paste(first_cell, (0, 0))
-                    energy_img.paste(energy, (2, 2))
-                    for i in range(6, 4 * self.current_energy, 4):
-                        energy_img.paste(cell, (i, 0))
-                        energy_img.paste(energy, (i, 2))
+            return self.addAsterisk(cost_image)
 
-                cost_image = energy_img
+        # Path 2: Energy numbers (total energy > 6)
+        x_img = Image.open("assets/general_assets/costs/energy/x.png").convert("RGBA")
 
-            if self.max_energy > 0:
-                if self.max_energy > 6:
-                    digits = list(str(self.max_energy))
-                    digits.reverse() # We reverse here so that the cells print properly
-                    overcharge_img = Image.new("RGBA", (10 + 4 * len(digits), 9))
-                    for i, digit in enumerate(digits):
-                        cell_x = 4 * (len(digits)-1-i)
-                        overcharge_img.paste(first_cell, (cell_x, 0))
-                        digit_img = Image.open(f"assets/general_assets/costs/energy/{digit}.png").convert("RGBA")
-                        overcharge_img.paste(digit_img, (cell_x + 2, 2), digit_img)
-                    
-                    x_img = Image.open(f"assets/general_assets/costs/energy/x.png").convert("RGBA")
-                    overcharge_img.paste(cell, (energy_img.width - 8, 0), cell)
-                    overcharge_img.paste(x_img, (energy_img.width - 8, 2), x_img)
-                    overcharge_img.paste(cell, (energy_img.width - 4, 0), cell)
-                    overcharge_img.paste(max_energy, (energy_img.width - 4, 2), max_energy)
+        energy_img = self._build_energy_section(self.current_energy, energy, first_cell, cell, x_img)
+        overcharge_img = self._build_energy_section(self.max_energy, max_energy, first_cell, cell, x_img, is_overcharge=True)
 
-                    energy_to_overcharge = {
-                        (117, 255, 220, 255): (255, 255, 3, 255),
-                        (33, 130, 147, 255): (255, 202, 3, 255)
-                    }
-                    for x in range(2, overcharge_img.width):
-                        for y in range(2, overcharge_img.height-1):
-                            if overcharge_img.getpixel((x, y)) in energy_to_overcharge:
-                                overcharge_img.putpixel((x, y), energy_to_overcharge[overcharge_img.getpixel((x, y))])
-                else:
-                    overcharge_img = Image.new("RGBA", (2 + 4 * self.max_energy, 9))
-                    overcharge_img.paste(first_cell, (0, 0))
-                    overcharge_img.paste(max_energy, (2, 2))
-                    for i in range(6, 4 * self.max_energy, 4):
-                        overcharge_img.paste(cell, (i, 0))
-                        overcharge_img.paste(max_energy, (i, 2))
+        if energy_img and overcharge_img:
+            cost_image = Image.new("RGBA", (energy_img.width + overcharge_img.width, 9))
+            cost_image.paste(energy_img, (0, 0))
+            cost_image.paste(overcharge_img, (energy_img.width, 0))
+        else:
+            cost_image = energy_img or overcharge_img
 
-                if cost_image:
-                    new_cost_img = Image.new("RGBA", (cost_image.width + overcharge_img.width, 9))
-                    new_cost_img.paste(cost_image, (0, 0))
-                    new_cost_img.paste(overcharge_img, (cost_image.width, 0))
-                    cost_image = new_cost_img
-                else:
-                    cost_image = overcharge_img
-        
         return self.addAsterisk(cost_image)
+
+
+    def _build_energy_section(self, amount: int, icon: Image, first_cell: Image, cell: Image, x_img: Image, is_overcharge: bool = False) -> Image:
+        if amount <= 0:
+            return None
+
+        if amount > 6:
+            digits = list(reversed(str(amount)))
+            img = Image.new("RGBA", (10 + 4 * len(digits), 9))
+
+            for i, digit in enumerate(digits):
+                cell_x = 4 * (len(digits) - 1 - i)
+                img.paste(first_cell, (cell_x, 0))
+                digit_img = Image.open(f"assets/general_assets/costs/energy/{digit}.png").convert("RGBA")
+                if is_overcharge:
+                    digit_img = self._recolor_overcharge_digit(digit_img)
+                img.paste(digit_img, (cell_x + 2, 2), digit_img)
+
+            w = img.width
+            img.paste(cell, (w - 8, 0), cell)
+            img.paste(x_img, (w - 8, 2), x_img)
+            img.paste(cell, (w - 4, 0), cell)
+            img.paste(icon, (w - 4, 2), icon)
+            return img
+
+        # Small bar section (amount <= 6)
+        img = Image.new("RGBA", (2 + 4 * amount, 9))
+        img.paste(first_cell, (0, 0))
+        img.paste(icon, (2, 2))
+        for i in range(6, 4 * amount, 4):
+            img.paste(cell, (i, 0))
+            img.paste(icon, (i, 2))
+        return img
+
+
+    def _recolor_overcharge_digit(self, img: Image) -> Image:
+        mapping = {
+            (117, 255, 220, 255): (255, 255, 3, 255),
+            (33, 130, 147, 255): (255, 202, 3, 255),
+        }
+        img = img.copy()
+        pixels = img.load()
+        for x in range(img.width):
+            for y in range(img.height):
+                if pixels[x, y] in mapping:
+                    pixels[x, y] = mapping[pixels[x, y]]
+        return img
 
     @classmethod
     def handle_segment(cls, segment: str, current_costs: list) -> bool:
