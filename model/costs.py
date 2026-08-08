@@ -156,23 +156,6 @@ class Energy(Cost):
         cell = Image.open("assets/general_assets/costs/energy/cell.png").convert("RGBA")
         energy = Image.open("assets/general_assets/costs/energy/energy.png").convert("RGBA")
         max_energy = Image.open("assets/general_assets/costs/energy/overcharge.png").convert("RGBA")
-
-        # Path 1: Full energy bar (total energy <= 6)
-        if (self.current_energy + self.max_energy) <= 6:
-            cost_image = Image.new("RGBA", (26, 9))
-            cost_image.paste(first_cell, (0, 0))
-            for i in range(6, 23, 4):
-                cost_image.paste(cell, (i, 0))
-
-            for i in range(2 + 4 * (6 - self.max_energy), 23, 4):
-                cost_image.paste(max_energy, (i, 2))
-
-            for i in range(2 + 4 * (6 - self.max_energy - self.current_energy), 23 - 4 * self.max_energy, 4):
-                cost_image.paste(energy, (i, 2))
-
-            return self.addAsterisk(cost_image)
-
-        # Path 2: Energy numbers (total energy > 6)
         x_img = Image.open("assets/general_assets/costs/energy/x.png").convert("RGBA")
 
         energy_img = self._build_energy_section(self.current_energy, energy, first_cell, cell, x_img)
@@ -192,7 +175,7 @@ class Energy(Cost):
         if amount <= 0:
             return None
 
-        if amount > 6:
+        if amount > 4:
             digits = list(reversed(str(amount)))
             img = Image.new("RGBA", (10 + 4 * len(digits), 9))
 
@@ -211,7 +194,7 @@ class Energy(Cost):
             img.paste(icon, (w - 4, 2), icon)
             return img
 
-        # Small bar section (amount <= 6)
+        # Small bar section (amount <= 4)
         img = Image.new("RGBA", (2 + 4 * amount, 9))
         img.paste(first_cell, (0, 0))
         img.paste(icon, (2, 2))
