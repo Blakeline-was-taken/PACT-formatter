@@ -30,6 +30,23 @@ class Cost:
         return image
 
 
+class Asterisk(Cost):
+
+    def getCostImage(self) -> Image:
+        return Image.open("assets/general_assets/costs/asterisk.png").convert("RGBA")
+
+    @classmethod
+    def handle_segment(cls, segment: str, current_costs: list) -> bool:
+        clean = segment.lower().strip()
+        if clean in ["*", "asterisk"]:
+            if current_costs:
+                current_costs[-1].asterisk = True
+            else:
+                current_costs.append(cls())
+            return True
+        return False
+
+
 class Blood(Cost):
 
     def __init__(self, amount: int):
@@ -315,11 +332,23 @@ def get_cost(strcost):
         return cost
     try:
         for c in strcost.split(" + "):
+            c_clean = c.strip()
+            if not c_clean:
+                continue
+
+            # Detect inline asterisks attached to other costs (e.g., "3 bones*")
+            has_inline_asterisk = False
+            if c_clean.lower() not in ["*", "asterisk"] and ("*" in c_clean or "asterisk" in c_clean.lower()):
+                has_inline_asterisk = True
+                c_clean = c_clean.replace("*", "").replace("asterisk", "").replace("ASTERISK", "").strip()
+
             handled = False
             # Dynamically check every subclass of Cost
             for subclass in Cost.get_all_subclasses():
-                if subclass.handle_segment(c, cost):
+                if subclass.handle_segment(c_clean, cost):
                     handled = True
+                    if has_inline_asterisk and cost:
+                        cost[-1].asterisk = True
                     break  # Stop checking other classes for this segment
             if not handled:
                 raise KeyError(f"Unknown cost type: {c}")

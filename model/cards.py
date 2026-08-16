@@ -166,18 +166,18 @@ def print_card_cost(config, image, csv_dict):
         cost_x -= config["cost_right_border_gemification_displacement"]
         
     cost_images = []
-    for cost in costs.get_cost(cost):
-        cost_images.append(apply_temple_colors(cost.getCostImage(), csv_dict['Temple'], csv_dict['Tier']))
+    for c in costs.get_cost(cost):
+        cost_images.append(apply_temple_colors(c.getCostImage(), csv_dict['Temple'], csv_dict['Tier']))
 
-    cost_y = config['cost_bottom_border'] - cost_images[0].height
+    cost_y = config['cost_bottom_border']
     height_to_skip = 0
-    for cost_img in cost_images:
+    for cost_img in reversed(cost_images):
         if cost_x - cost_img.width < config['cost_left_border'] and height_to_skip > 0:
             cost_x = config['cost_right_border']
             cost_y -= height_to_skip + 1
             height_to_skip = 0
         height_to_skip = max(height_to_skip, cost_img.height)
-        image.paste(cost_img, (cost_x - cost_img.width, cost_y), cost_img)
+        image.paste(cost_img, (cost_x - cost_img.width, cost_y - cost_img.height), cost_img)
         cost_x -= cost_img.width + 1
 
 
