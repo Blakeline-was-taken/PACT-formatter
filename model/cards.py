@@ -286,8 +286,7 @@ def print_card_sigils_and_traits(config, color_map, bg_modifier, image, sigil_y,
             overlay.paste(trait_img, (sigil_x, trait_y), trait_img)
             trait_y += trait_img.height + config['trait_vertical_spacing']
 
-    image.paste(overlay, (0, 0), overlay)
-    return image
+    return Image.alpha_composite(image, overlay)
 
 
 def print_base_game_card(config, color_map, bg_modifier, image, sigil_y, csv_dict, sigil_list, trait_list):
@@ -353,8 +352,7 @@ def print_base_game_card(config, color_map, bg_modifier, image, sigil_y, csv_dic
             overlay.paste(trait_img, (sigil_left, trait_y), trait_img)
             trait_y += trait_img.height + config['trait_vertical_spacing']
 
-    image.paste(overlay, (0, 0), overlay)
-    return image
+    return Image.alpha_composite(image, overlay)
 
 
 def write_name(config, image, draw, csv_dict):
