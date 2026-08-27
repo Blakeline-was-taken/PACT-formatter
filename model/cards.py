@@ -226,6 +226,7 @@ def paste_empty_cardback_bottom(config, image, temple, tier, bg_modifier=None):
 
 
 def print_card_sigils_and_traits(config, color_map, bg_modifier, image, sigil_y, csv_dict, sigil_list, trait_list, use_shortened_format):
+    overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
     # -----------------------
     # Print the sigils
     # -----------------------
@@ -235,7 +236,7 @@ def print_card_sigils_and_traits(config, color_map, bg_modifier, image, sigil_y,
             sigil_y -= sigil.top_displacement
             sigil_y -= sigil_y % 10
             sigil_img = sigil.getImage(config, color_map, csv_dict['Temple'], csv_dict['Tier'], bg_modifier, use_shortened_format)
-            image = paste_sigil(image, sigil_img, (0, sigil_y))
+            overlay = paste_sigil(overlay, sigil_img, (0, sigil_y))
             sigil_y -= sigil.bottom_displacement
         else:
             sigil_img = sigil.getImage(shortened_format=use_shortened_format)
@@ -247,7 +248,7 @@ def print_card_sigils_and_traits(config, color_map, bg_modifier, image, sigil_y,
                 if image is None:
                     # If the sigils would overlap with the bottom border of the card and bottom removal is not allowed, return None to indicate failure
                     return None
-            image = paste_sigil(image, sigil_img, (sigil_x, sigil_y))
+            overlay = paste_sigil(overlay, sigil_img, (sigil_x, sigil_y))
         sigil_y += sigil_img.height + config['sigil_vertical_spacing']
 
     # -----------------------
@@ -279,15 +280,18 @@ def print_card_sigils_and_traits(config, color_map, bg_modifier, image, sigil_y,
             else:
                 trait_y = sigil_y - (sigil_y % 10) + 10
 
-        image.paste(traitline_img, ((image.width - traitline_img.width) // 2, trait_y), traitline_img)
+        overlay.paste(traitline_img, ((overlay.width - traitline_img.width) // 2, trait_y), traitline_img)
         trait_y += traitline_img.height + config['traitline_vertical_spacing']
         for trait_img in trait_images:
-            image.paste(trait_img, (sigil_x, trait_y), trait_img)
+            overlay.paste(trait_img, (sigil_x, trait_y), trait_img)
             trait_y += trait_img.height + config['trait_vertical_spacing']
-    return image
+
+    return Image.alpha_composite(image, overlay)
 
 
 def print_base_game_card(config, color_map, bg_modifier, image, sigil_y, csv_dict, sigil_list, trait_list):
+    overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
+    
     trait_height = 0
     if len(trait_list) > 0:
         traitline_img = get_traitline_image(csv_dict['Temple'], csv_dict['Tier'], bg_modifier)
@@ -337,17 +341,18 @@ def print_base_game_card(config, color_map, bg_modifier, image, sigil_y, csv_dic
         space_between = free_space / (num_sigils + 1) if num_sigils > 0 else 0
         row_x = sigil_left + space_between
         for sigil_img in row:
-            image.paste(sigil_img, (int(row_x), sigil_y), sigil_img)
+            overlay.paste(sigil_img, (int(row_x), sigil_y), sigil_img)
             row_x += sigil_img.width + space_between
         sigil_y += sigil_heights[row_index] + config['sigil_vertical_spacing']
 
-    image.paste(traitline_img, ((image.width - traitline_img.width) // 2, trait_y), traitline_img)
-    trait_y += traitline_img.height + config['traitline_vertical_spacing']
-    for trait_img in trait_images:
-        image.paste(trait_img, (sigil_left, trait_y), trait_img)
-        trait_y += trait_img.height + config['trait_vertical_spacing']
+    if len(trait_list) > 0:
+        overlay.paste(traitline_img, ((overlay.width - traitline_img.width) // 2, trait_y), traitline_img)
+        trait_y += traitline_img.height + config['traitline_vertical_spacing']
+        for trait_img in trait_images:
+            overlay.paste(trait_img, (sigil_left, trait_y), trait_img)
+            trait_y += trait_img.height + config['trait_vertical_spacing']
 
-    return image
+    return Image.alpha_composite(image, overlay)
 
 
 def write_name(config, image, draw, csv_dict):
