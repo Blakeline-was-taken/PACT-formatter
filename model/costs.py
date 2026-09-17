@@ -176,7 +176,7 @@ class Energy(Cost):
         x_img = Image.open("assets/general_assets/costs/energy/x.png").convert("RGBA")
 
         energy_img = self._build_energy_section(self.current_energy, energy, first_cell, cell, x_img)
-        overcharge_img = self._build_energy_section(self.max_energy, max_energy, first_cell, cell, x_img, is_overcharge=True)
+        overcharge_img = self._build_energy_section(self.max_energy, max_energy, first_cell, cell, self._recolor_overcharge(x_img), is_overcharge=True)
 
         if energy_img and overcharge_img:
             cost_image = Image.new("RGBA", (energy_img.width + overcharge_img.width, 9))
@@ -201,7 +201,7 @@ class Energy(Cost):
                 img.paste(first_cell, (cell_x, 0))
                 digit_img = Image.open(f"assets/general_assets/costs/energy/{digit}.png").convert("RGBA")
                 if is_overcharge:
-                    digit_img = self._recolor_overcharge_digit(digit_img)
+                    digit_img = self._recolor_overcharge(digit_img)
                 img.paste(digit_img, (cell_x + 2, 2), digit_img)
 
             w = img.width
@@ -221,7 +221,7 @@ class Energy(Cost):
         return img
 
 
-    def _recolor_overcharge_digit(self, img: Image) -> Image:
+    def _recolor_overcharge(self, img: Image) -> Image:
         mapping = {
             (117, 255, 220, 255): (255, 255, 3, 255),
             (33, 130, 147, 255): (255, 202, 3, 255),
