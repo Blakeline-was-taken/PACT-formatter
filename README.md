@@ -59,6 +59,68 @@ The migration script does a lot of automatic restructuring to prevent a lot of t
   * If a sigil has "Conduit" in the name, it gains the **`conduit_sigil`** asset tracker to still use a conduit sigil indicator. Note that those can be turned off by setting the `show_conduit_sigil_indicators` config option to **false**.
   * The script interprets the sigil's description text to know if it acts as a Mox provider, in which case it applies the correct gem overlay tag (**`mox_green`**, **`mox_orange`**, **`mox_blue`**, or **`mox_prism`**). This is used for cards with the mox indicator.
 
+# Getting Started & Migration Guide
+
+## How to Install
+
+Most of the tools this program needs are already built directly into Python. However, you will need to install two external library packages to handle the images and show progress bars (that one will most likely be removed soon so you might not actually need to do this later).
+
+### 1. Install Python
+
+If you haven't already, download and install **Python 3** from the official website (python.org). Make sure to check the box that says **"Add Python to PATH"** during the installation process.
+
+### 2. Install the Required Packages
+
+Open your computer's **Terminal** (Mac/Linux) or **Command Prompt** (Windows), type the following command, and press **Enter**:
+
+```bash
+pip install -r requirements.txt
+```
+
+* **Pillow** is the engine that handles all the heavy lifting for drawing, layering, and color-swapping image assets. This formatter quite literally cannot work without it.
+* **tqdm** creates the visual progress bars used by the legacy command-line exporter. But it's clunky and doesn't even work so it's probably gonna go soon.
+* **PySide6** provides the native GUI shell.
+
+---
+
+## Upgrading from the Old Formatter
+
+If you have a collection of cards created in the older version of the formatter, follow these steps to migrate your assets and data sheets to the new system.
+
+1. **Move Assets:** Take your old `card_art` and `sigils` folders and place them inside the new `assets/general_assets/` directory.
+2. **Place the Old Data Sheets (say that again?):** Grab your old `cards.csv`, `sigils.csv`, and `traits.csv` files and place them in the `data/` folder (replacing the files inside).
+3. **Run the Converter:** Open the terminal or command prompt in that folder and run the conversion script by typing:
+```bash
+python convert_old_formatter_data.py
+```
+
+4. **Clean Up and Rename:** The script will create three new files in the main directory. Delete your old files (or back them up) and rename the new ones to remove the `updated_` prefix so the application can read them:
+* Rename `updated_cards.csv` to **`cards.csv`**
+* Rename `updated_sigils.csv` to **`sigils.csv`**
+* Rename `updated_traits.csv` to **`traits.csv`**
+
+*(Alternative: You can leave the names as `updated_cards.csv` etc., but you will need to open your `general.json` configuration file and change the file paths to match those exact names. If you really want to do that for some reason).*
+
+---
+
+## What Changed?
+
+The migration script does a lot of automatic restructuring to prevent a lot of tedious manual editing. Here is a summary of what changed under the hood and why these new data sheets look a little different:
+
+### Changes to Cards (`cards.csv`)
+
+* **Art File section:** The new system no longer uses the card's name to fetch its art, meaning there can now be multiple cards with the same name. The script creates a new **`Art File`** column, which it fills by following the old formatter's naming convention. (for example, a card named "Wild Wolf!" will have "WildWolf.png" in its Art File column).
+* **Unified Background Tags:** This new formatter now has a Tags system for cards, sigils and traits. This is useful for a variety of things, and you are encouraged to check out the CSV Data Models section to see what tags exist natively and what they can do. But all the conversion script does is adding the **`bloodless_bg`** tag to cards that had a Bloodless sigil or trait, as that is how it used to work. **Do note that you no longer need a card to have a Bloodless sigil/trait in order for it to have the bloodless background, and vice versa**.
+
+### Changes to Sigils & Traits (`sigils.csv` & `traits.csv`)
+
+* **Bracket Change:** The new text layout engine uses curly brackets instead of square ones to display inline graphics, as square brackets could actually be used by the heavyweight font while curly brackets cannot. The script automatically converts old text codes like `[sigil:TouchOfDeath]` into `{sigil:TouchOfDeath}`.
+* **Tags:** Instead of cluttered, individual columns tracking specific behaviors, everything has been streamlined into a single, multi-purpose `Tags` column. The script cleans this up by converting old data toggles:
+  * If a sigil shouldn't be color-swapped, it gets tagged with **`has_color`**.
+  * If the sigil/trait needs to replace the power value entirely, it gets tagged with `power_sigil`. Note that you can now also do this for health using the `health_sigil` tag.
+  * If a sigil has "Conduit" in the name, it gains the **`conduit_sigil`** asset tracker to still use a conduit sigil indicator. Note that those can be turned off by setting the `show_conduit_sigil_indicators` config option to **false**.
+  * The script interprets the sigil's description text to know if it acts as a Mox provider, in which case it applies the correct gem overlay tag (**`mox_green`**, **`mox_orange`**, **`mox_blue`**, or **`mox_prism`**). This is used for cards with the mox indicator.
+
 # How to Use
 
 Generating custom cards, sigils, and traits is a three-step process: prepare the data, place the raw image assets, and run the generator script.
@@ -86,7 +148,7 @@ Each of these data sheets have their structure detailed later down in this docum
 
 ## 2. Running the Generator
 
-The formatter features an command-line interface that can render the entire library or pinpoint specific items.
+The formatter now opens the editor GUI by default:
 
 1. **Launch the Main Script:** Open a terminal in the root directory of the project and run the main entry point:
 
@@ -94,7 +156,17 @@ The formatter features an command-line interface that can render the entire libr
 python main.py
 ```
 
-2. **Select Asset Type:** The CLI will prompt you to select what you want to render. Enter the corresponding number:
+The initial GUI provides tabs for cards, sigils and traits, templates and layouts, assets, configuration, and exports. These tabs are the foundation for the editors being added in later iterations.
+
+The GUI shell, Card Editor, and legacy CLI are grouped in the `interfaces/` package. The project root keeps `main.py` as the single application entry point, while renderer and data-model code remains in `model/`.
+
+The legacy command-line exporter remains available while the GUI is being developed:
+
+```bash
+python main.py --cli
+```
+
+When using the CLI, select the asset type when prompted:
 
 * `1` for Cards
 * `2` for Sigils
