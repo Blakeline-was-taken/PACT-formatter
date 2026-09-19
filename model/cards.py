@@ -399,10 +399,11 @@ def write_metadata(config, color_map, image, draw, csv_dict):
 
 def write_art_credit(config, color_map, image, draw, csv_dict):
     art_credit_font = ImageFont.truetype(FONT, config['art_credit_font_size'])
-    artist_text = f"Art by {csv_dict['Credit']}"
-    desc_y = config['art_credit_top_border']
-    desc_x = (image.width - draw.textlength(artist_text, font=art_credit_font)) // 2
-    draw.text((desc_x, desc_y), artist_text, color_map["art_credit_color"], font=art_credit_font)
+    if csv_dict['Credit']:
+        artist_text = f"Art by {csv_dict['Credit']}"
+        desc_y = config['art_credit_top_border']
+        desc_x = (image.width - draw.textlength(artist_text, font=art_credit_font)) // 2
+        draw.text((desc_x, desc_y), artist_text, color_map["art_credit_color"], font=art_credit_font)
 
 
 def write_stats(config, image, csv_dict, power_sigil, health_sigil, bg_modifier):

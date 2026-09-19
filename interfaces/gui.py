@@ -102,7 +102,7 @@ class EditorWindow(QMainWindow):
             CardEditor,
         ),
         (
-            "Sigil & Trait Editor",
+            "Sigil/Trait Editor",
             lambda: EditorPage(
                 "Sigil & Trait Editor",
                 "Manage sigils and traits from one shared editing workspace.",
@@ -110,7 +110,7 @@ class EditorWindow(QMainWindow):
             ),
         ),
         (
-            "Template & Layout",
+            "Template/Layout Editor",
             lambda: EditorPage(
                 "Template & Layout Editor",
                 "Tune temple and tier-specific positioning and card templates.",

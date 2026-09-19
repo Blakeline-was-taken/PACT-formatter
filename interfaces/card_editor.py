@@ -670,7 +670,7 @@ class CardEditor(QWidget):
         self.costs = CostList()
         self.costs.changed.connect(self._changed)
         form.addRow("Cost", self.costs)
-        sigil_options = self._load_names("sigils.csv", "Name") + ["TRIBAL", "ARCANE"]
+        sigil_options = self._load_names("sigils.csv", "Name") + ["TRIBAL", "RAINBOW"]
         self.sigils = SigilList(sigil_options)
         self.sigils.changed.connect(self._changed)
         form.addRow("Sigils", self.sigils)

@@ -68,7 +68,7 @@ def get_color_mapping(temple, tier=None, bg_modifier=None):
             break
 
     if not color_path:
-        return {}
+        color_path = f"{ASSETS_DIR}/general_assets/colors.png"  # Fallback to general colors
 
     config = load_config(temple, tier, bg_modifier)
     color_keys = list(Image.open(f"{ASSETS_DIR}/general_assets/colors.png").getdata())
