@@ -18,7 +18,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from .card_editor import CardEditor
 
 
 class EditorPage(QWidget):
@@ -99,15 +98,11 @@ class EditorWindow(QMainWindow):
         ("Overview", WelcomePage),
         (
             "Card Editor",
-            CardEditor,
+            None,
         ),
         (
             "Sigil/Trait Editor",
-            lambda: EditorPage(
-                "Sigil & Trait Editor",
-                "Manage sigils and traits from one shared editing workspace.",
-                "Sigil and trait data editing controls will appear here.",
-            ),
+            None,
         ),
         (
             "Template/Layout Editor",
@@ -159,6 +154,9 @@ class EditorWindow(QMainWindow):
         self.menuBar().addMenu("File").addAction(close_action)
 
     def _build_tabs(self):
+        from .card_editor import CardEditor
+        from .sigil_trait_editor import SigilTraitEditor
+
         self.tabs = QTabWidget()
         self.tabs.setDocumentMode(True)
         self.tabs.setMovable(False)
@@ -166,6 +164,8 @@ class EditorWindow(QMainWindow):
         self.setCentralWidget(self.tabs)
 
         for name, page_factory in self.TAB_DEFINITIONS:
+            if page_factory is None:
+                page_factory = CardEditor if name == "Card Editor" else SigilTraitEditor
             self.tabs.addTab(page_factory(), name)
 
     def _tab_changed(self, index):
