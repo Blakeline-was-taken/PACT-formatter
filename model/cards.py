@@ -84,6 +84,7 @@ def get_sigil_data(config, csv_dict):
                     target_obj.addToken(str_tokens[token_id % len(str_tokens)])
                     token_id += 1
             for tag in target_obj.tags.split(','):
+                tag = tag.strip()
                 if "power_sigil" in tag:
                     power_sigil = target_obj.sigilImage()
                 elif "health_sigil" in tag:
