@@ -79,12 +79,11 @@ class WelcomePage(QWidget):
         overview_layout.setContentsMargins(24, 24, 24, 24)
         overview_layout.setSpacing(12)
         for text in (
-            "Card Editor — card records and individual card previews",
-            "Sigil & Trait Editor — shared tools for sigil and trait data",
-            "Template & Layout Editor — temple and tier positioning",
-            "Asset Manager — find, inspect, and add image assets",
-            "Config Editor — global formatter and printing options",
-            "Export — render cards, sigils, and traits in bulk",
+            "Card Editor - Change, Preview and Export individual cards with live updates",
+            "Sigil & Trait Editor - Change, Preview and Export sigils and traits with live updates",
+            "Template Editor - Tweak positioning and assets for all the different card templates",
+            "Config Editor - Edit global formatter options and printing formats",
+            "Export - Render cards, sigils, and traits in bulk",
         ):
             label = QLabel(text)
             label.setObjectName("overviewItem")
@@ -105,19 +104,11 @@ class EditorWindow(QMainWindow):
             None,
         ),
         (
-            "Template/Layout Editor",
+            "Template Editor",
             lambda: EditorPage(
-                "Template & Layout Editor",
-                "Tune temple and tier-specific positioning and card templates.",
-                "Template, temple, and tier layout controls will appear here.",
-            ),
-        ),
-        (
-            "Asset Manager",
-            lambda: EditorPage(
-                "Asset Manager",
-                "Review required assets, locate missing files, and add replacements.",
-                "Asset inventory and missing-asset actions will appear here.",
+                "Template Editor",
+                "Tweak positioning and assets for all the different card templates.",
+                "Temple and tier layout controls will appear here.",
             ),
         ),
         (
