@@ -18,6 +18,17 @@ def get_resized_image(img, height):
     return img.resize((int(img.width * (height / img.height)), height))
 
 
+def get_outline_asset(path):
+    if not os.path.exists(path):
+        return path
+    directory, filename = os.path.split(path)
+    stem, ext = os.path.splitext(filename)
+    outline_path = os.path.join(directory, f"{stem}_outline{ext}")
+    if os.path.exists(outline_path):
+        return outline_path
+    return path
+
+
 def write_description(x_offset, y_offset, starting_size, description_words, color, text_img, size_limit, shortened_format):
     draw = ImageDraw.Draw(text_img)
     font = ImageFont.truetype(FONT, SIGIL_DESCRIPTION_SIZE)
@@ -59,9 +70,7 @@ def write_description(x_offset, y_offset, starting_size, description_words, colo
                     icon_name = content[colon_id + 1:]
                     icon_path = f"assets/general_assets/{icon_type}/{icon_name}.png"
                     if color != "black":
-                        new_path = f"assets/general_assets/sigils/{icon_type}/{icon_name[:-1]}_outline.png"
-                        if os.path.exists(new_path):
-                            icon_path = new_path
+                        icon_path = get_outline_asset(icon_path)
                     try:
                         icon = get_resized_image(Image.open(icon_path), SIGIL_DESC_ICON_SIZE)
                     except FileNotFoundError:
@@ -149,10 +158,8 @@ class Sigil:
     def sigilImage(self, color='black'):
         name = self.name.translate(str.maketrans("", "", " ',-!?"))
         path = f"assets/general_assets/sigils/{name}.png"
-        if not DEFAULT_CONFIG["allow_colored_sigils"] or (color != "black" and "has_color" in self.tags):
-            new_path = f"assets/general_assets/sigils/{name}_outline.png"
-            if os.path.exists(new_path):
-                path = new_path
+        if not DEFAULT_CONFIG["allow_colored_sigils"] or color != "black":
+            path = get_outline_asset(path)
         try:
             sigil_img = Image.open(path).convert("RGBA")
         except FileNotFoundError as e:
@@ -245,9 +252,7 @@ class Sigil:
                 icon_type = "sigils" if "sigil" in word else "icons"
                 icon_path = f"assets/general_assets/{icon_type}/{word[colon_id + 1:-1]}.png"
                 if color != 'black':
-                    new_path = f"assets/general_assets/{icon_type}/{word[colon_id + 1:-1]}_outline.png"
-                    if os.path.exists(new_path):
-                        icon_path = new_path
+                    icon_path = get_outline_asset(icon_path)
                 try:
                     icon = get_resized_image(Image.open(icon_path), TRAIT_DESC_ICON_SIZE)
                 except FileNotFoundError:
