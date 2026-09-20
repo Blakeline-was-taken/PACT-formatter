@@ -83,7 +83,8 @@ def get_color_mapping(temple, tier=None, bg_modifier=None):
         "arcane_dark_color",
         "arcane_light_color",
         "tribal_dark_color",
-        "tribal_light_color"
+        "tribal_light_color",
+        "hint_color"
     ]
     for i in range(len(color_keys)):
         if i < len(colors):
