@@ -174,7 +174,7 @@ class SigilTraitEditor(QWidget):
         preview_layout = QHBoxLayout(self.preview_bar)
         preview_layout.setContentsMargins(0, 0, 0, 0)
         self.preview_condition = NoWheelComboBox()
-        self.preview_condition.addItems(["None", "Cell", "Latch", "Gemified", "Tribal", "Rainbow"])
+        self.preview_condition.addItems(["None", "Cell", "Latch", "Hint", "Gemified", "Tribal", "Rainbow"])
         self.preview_condition.setCurrentText("None")
         self.preview_condition.currentTextChanged.connect(self._condition_changed)
         preview_layout.addWidget(self.preview_condition)
@@ -295,7 +295,7 @@ class SigilTraitEditor(QWidget):
                 current.append("TRIBAL")
             elif conditional == "Rainbow":
                 current.append("RAINBOW")
-            if conditional in ("Cell", "Latch"):
+            if conditional in ("Cell", "Latch", "Hint"):
                 current.append(f"{conditional}_{name}")
             elif conditional == "Gemified":
                 current.append(self.preview_gems.value(name))

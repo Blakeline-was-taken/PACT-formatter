@@ -258,7 +258,7 @@ class SigilRow(DraggableRow):
         layout.setContentsMargins(6, 0, 6, 0)
         self.label = QLabel(name)
         self.conditional = NoWheelComboBox()
-        self.conditional.addItems(["None", "Cell", "Latch", "Gemified"])
+        self.conditional.addItems(["None", "Cell", "Latch", "Hint", "Gemified"])
         self.conditional.setCurrentText(conditional)
         self.gemification = Gemification(False)
         self.gemification.setVisible(conditional == "Gemified")
@@ -431,7 +431,7 @@ class SigilList(ElementList):
         if value.lower() == "tribal":
             return value, "None", ""
         parts = value.split("_")
-        if parts[0].lower() in ("cell", "latch"):
+        if parts[0].lower() in ("cell", "latch", "hint"):
             return "_".join(parts[1:]), parts[0].title(), ""
         gems = [part for part in parts[:-1] if part.lower() in ("green", "blue", "orange", "prism")]
         if gems:
@@ -470,7 +470,7 @@ class SigilList(ElementList):
                 result.append("rainbow")
             elif name.lower() == "tribal":
                 result.append("tribal")
-            elif conditional in ("Cell", "Latch"):
+            elif conditional in ("Cell", "Latch", "Hint"):
                 result.append(f"{conditional}_{name}")
             elif conditional == "Gemified":
                 value = row.gemification.value(name)
