@@ -54,6 +54,7 @@
     "arcane_light_color_index": 5,
     "tribal_dark_color_index": 6,
     "tribal_light_color_index": 5,
+    "hint_color_index": 6,
 
     "sigil_img_scale": 100,
     "allow_colored_sigils": true,

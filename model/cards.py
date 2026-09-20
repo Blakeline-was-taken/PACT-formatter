@@ -527,6 +527,29 @@ class LatcherConditional(SigilConditional):
         return None
 
 
+class HintConditional(SigilConditional):
+
+    def __init__(self, config, sigil):
+        super().__init__(sigil)
+    
+    def getImage(self, config, color_map, temple, tier, bg_modifier, use_shortened_format=False):
+        sigil_img = self.sigil.getImage(
+            color=color_map["hint_color"],
+            shortened_format=use_shortened_format
+        )
+        patch_image = Image.new("RGBA", (sigil_img.width + config["sigil_left_border"], sigil_img.height), (0, 0, 0, 0))
+        return paste_sigil(patch_image, sigil_img, (config["sigil_left_border"], 0))
+
+    @classmethod
+    def handle_sigil_entry(cls, config, sigil_entry: str):
+        if "_" not in sigil_entry:
+            return None
+        sigil = sigil_entry.split("_")
+        if sigil[0].lower() == "hint":
+            if sigil[1] in sigils.SIGILS:
+                return HintConditional(config, sigils.SIGILS[sigil[1]].copy())
+        return None
+
 class GemifyConditional(SigilConditional):
 
     def __init__(self, config, sigil, gems=[]):
