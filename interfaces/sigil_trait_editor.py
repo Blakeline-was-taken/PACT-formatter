@@ -417,6 +417,7 @@ class SigilTraitEditor(QWidget):
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, target)
         icon_to_edit.setText(str(target.name))
+        self._render_preview()
 
     def _delete_colorless_icon(self):
         name = self.name_edit.text().strip()

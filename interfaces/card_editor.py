@@ -748,7 +748,7 @@ class CardEditor(QWidget):
         self.original = dict(self.rows[index])
         self._populate(self.original)
         self._refresh_search(self.original.get("Card Name", ""))
-        self._render()
+        self._render_preview()
 
     def _populate(self, row):
         """Populate every editor control from one CSV row."""
@@ -808,9 +808,9 @@ class CardEditor(QWidget):
     def _changed(self):
         """Refresh the preview after user edits, except during bulk loading."""
         if not self.loading:
-            self._render()
+            self._render_preview()
 
-    def _render(self):
+    def _render_preview(self):
         """Render the current form state and show failures in the preview pane."""
         row = self._current_row()
         try:
@@ -827,7 +827,7 @@ class CardEditor(QWidget):
         if hasattr(self, "form_scroll"):
             self.form_body.setMinimumWidth(self.form_scroll.viewport().width())
         if self.current_index >= 0:
-            self._render()
+            self._render_preview()
 
     def _dirty(self):
         """Return whether the current controls differ from the loaded snapshot."""
@@ -850,7 +850,7 @@ class CardEditor(QWidget):
         self._populate({field: "" for field in CARD_FIELDS})
         self.art.setText("")
         self._refresh_search("")
-        self._render()
+        self._render_preview()
 
     def _choose_art(self):
         """Choose art from the configured card-art directory."""
@@ -860,6 +860,7 @@ class CardEditor(QWidget):
         if filename:
             selected = Path(filename)
             self.art.setText(selected.name if selected.parent.resolve() == ASSET_PATH.resolve() else str(selected))
+            self._render_preview()
 
     def _save(self, export=False):
         """Write the current row, optionally render it, and report export success."""
@@ -905,7 +906,7 @@ class CardEditor(QWidget):
                 "Card exported",
                 f"{row['Card Name']} was exported to {target}.",
             )
-        self._render()
+        self._render_preview()
         return True
 
     def _delete_card(self):
