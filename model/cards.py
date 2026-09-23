@@ -671,7 +671,7 @@ def create_card(csv_dict):
     image = get_cardback(csv_dict['Temple'], csv_dict['Tier'], bg_modifier)
 
     # Add gemification indicator if needed
-    if "gemified_vanila" in csv_dict['Tags']:
+    if "gemified_vanilla" in csv_dict['Tags']:
         vanilla_gemification = get_vanilla_gemification(csv_dict['Temple'], csv_dict['Tier'], bg_modifier)
         image.paste(vanilla_gemification, (0, 0), vanilla_gemification)
 
