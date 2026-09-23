@@ -27,7 +27,6 @@ TRAIT_PATH = ROOT / DEFAULT_CONFIG["traits_file_path"]
 SIGIL_ICON_DIR = ROOT / DEFAULT_CONFIG["assets_dir"] / "general_assets" / "sigils"
 
 SIGIL_TAG_OPTIONS = [
-    "has_color",
     "power_sigil",
     "health_sigil",
     "mox_green",
@@ -137,7 +136,20 @@ class SigilTraitEditor(QWidget):
         icon_row.addWidget(self.icon_edit, 1)
         icon_row.addWidget(choose_icon)
         form.addRow("Icon", icon_row)
-
+        
+        self.colorless_icon_edit = QLineEdit()
+        self.colorless_icon_edit.setReadOnly(True)
+        colorless_choose_icon = QPushButton("Choose colorless icon...")
+        colorless_choose_icon.clicked.connect(lambda: self._choose_icon(colorless=True))
+        colorless_delete_icon = QPushButton("X")
+        colorless_delete_icon.setFixedWidth(30)
+        colorless_delete_icon.clicked.connect(self._delete_colorless_icon)
+        colorless_icon_row = QHBoxLayout()
+        colorless_icon_row.addWidget(self.colorless_icon_edit, 1)
+        colorless_icon_row.addWidget(colorless_choose_icon)
+        colorless_icon_row.addWidget(colorless_delete_icon)
+        form.addRow("Colorless Icon", colorless_icon_row)
+        
         self.tags = QWidget()
         tags_layout = QVBoxLayout(self.tags)
         self.tag_checks = {}
@@ -244,9 +256,13 @@ class SigilTraitEditor(QWidget):
         self.name_edit.setText(row.get("Name", ""))
         self.description_edit.setText(row.get("Description", ""))
         self.type_combo.setCurrentText(row.get("Type", "Sigil" if self.current_section == "Sigils" else "Trait"))
+        
         icon_name = _normalize_sigil_name(row.get("Name", ""))
         icon_path = SIGIL_ICON_DIR / f"{icon_name}.png"
         self.icon_edit.setText(icon_path.name if icon_name and icon_path.is_file() else "")
+        icon_path = SIGIL_ICON_DIR / f"{icon_name}_outline.png"
+        self.colorless_icon_edit.setText(icon_path.name if icon_name and icon_path.is_file() else "")
+
         tags = set(_split(row.get("Tags", "")))
         for tag, check in self.tag_checks.items():
             check.setChecked(tag in tags)
@@ -287,8 +303,6 @@ class SigilTraitEditor(QWidget):
         preview_type = row["Type"]
 
         if preview_type == "Sigil":
-            if "has_color" in tags:
-                pass
             conditional = self.preview_condition.currentText()
             current = []
             if conditional == "Tribal":
@@ -368,8 +382,9 @@ class SigilTraitEditor(QWidget):
 
         return QPixmap.fromImage(ImageQt(image)).scaled(320, 420, Qt.KeepAspectRatio, Qt.SmoothTransformation)
 
-    def _choose_icon(self):
+    def _choose_icon(self, colorless=False):
         name = self.name_edit.text().strip()
+        icon_to_edit = self.colorless_icon_edit if colorless else self.icon_edit
         if not name:
             QMessageBox.warning(self, "Missing name", "Enter a name before choosing an icon.")
             return
@@ -384,9 +399,10 @@ class SigilTraitEditor(QWidget):
             return
 
         source = Path(filename)
-        target = SIGIL_ICON_DIR / f"{_normalize_sigil_name(name)}.png"
+        outline = "_outline" if colorless else ""
+        target = SIGIL_ICON_DIR / f"{_normalize_sigil_name(name)}{outline}.png"
         if source.resolve() == target.resolve():
-            self.icon_edit.setText(str(target.name))
+            icon_to_edit.setText(str(target.name))
             return
         if target.exists() and source.resolve() != target.resolve():
             result = QMessageBox.warning(
@@ -400,7 +416,35 @@ class SigilTraitEditor(QWidget):
                 return
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, target)
-        self.icon_edit.setText(str(target.name))
+        icon_to_edit.setText(str(target.name))
+
+    def _delete_colorless_icon(self):
+        name = self.name_edit.text().strip()
+        if not name:
+            return
+
+        icon_name = _normalize_sigil_name(name)
+        target = SIGIL_ICON_DIR / f"{icon_name}_outline.png"
+
+        if not target.is_file():
+            self.colorless_icon_edit.setText("")
+            return
+
+        result = QMessageBox.warning(
+            self,
+            "Delete icon?",
+            f"Are you sure you want to delete {target.name}?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if result == QMessageBox.Yes:
+            try:
+                target.unlink()
+            except OSError as error:
+                QMessageBox.warning(self, "Error", f"Could not delete icon: {error}")
+                return
+            self.colorless_icon_edit.setText("")
+            self._render_preview()
 
     def _save(self, export=False):
         data = self._current_data()
