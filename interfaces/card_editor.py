@@ -40,7 +40,7 @@ CARD_FIELDS = [
     "Sigils", "Token", "Traits", "Tribes", "Flavor Text", "Credit", "Tags",
 ]
 TAG_OPTIONS = [
-    "bloodless_bg", "conduit_indicator", "mox_indicator", "mox_green",
+    "conduit_indicator", "mox_indicator", "mox_green",
     "mox_orange", "mox_blue", "mox_prism", "gemified_vanilla",
     "conduit_sigil_indicator",
 ]
@@ -572,8 +572,10 @@ class CardEditor(QWidget):
 
         self.temple = self._suggested_field(self._unique_column_values("Temple"))
         self.tier = self._suggested_field(self._unique_column_values("Tier"))
+        self.background = self._suggested_field(self._unique_background_modifiers())
         self.fields["Temple"] = self.temple
         self.fields["Tier"] = self.tier
+        self.fields["Background"] = self.background
         form.addRow("Temple", self.temple)
         form.addRow("Tier", self.tier)
 
@@ -648,9 +650,12 @@ class CardEditor(QWidget):
     def _tag_editor(self):
         """Build the fixed set of card tag toggles and extra-cell count."""
         widget = QWidget()
-        layout = QGridLayout(widget)
+        outer = QVBoxLayout(widget)
+        outer.setContentsMargins(0, 0, 0, 0)
+        layout = QGridLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
+        outer.addLayout(layout)
         self.tag_checks = {}
         for index, tag in enumerate(TAG_OPTIONS):
             check = QPushButton(tag)
@@ -658,11 +663,15 @@ class CardEditor(QWidget):
             check.toggled.connect(self._changed)
             layout.addWidget(check, index // 4, index % 4)
             self.tag_checks[tag] = check
+        background_row = QHBoxLayout()
+        background_row.addWidget(QLabel("Background"))
+        background_row.addWidget(self.background, 1)
+        outer.addLayout(background_row)
         self.extra_cell_amount = QSpinBox()
         self.extra_cell_amount.setRange(0, 99)
         self.extra_cell_amount.setPrefix("Extra cells: ")
         self.extra_cell_amount.valueChanged.connect(self._changed)
-        layout.addWidget(self.extra_cell_amount, 3, 0, 1, 4)
+        outer.addWidget(self.extra_cell_amount)
         return widget
 
     def _build_preview(self):
@@ -698,6 +707,26 @@ class CardEditor(QWidget):
         for row in self.rows:
             values.update(_split(row.get(key, "")))
         return sorted(values)
+
+    def _unique_background_modifiers(self):
+        """Return modifiers encoded by existing cards' *_bg tags."""
+        modifiers = set()
+        for row in self.rows:
+            for tag in _split(row.get("Tags", "")):
+                normalized_tag = tag.lower()
+                if normalized_tag.endswith("_bg") and normalized_tag[:-3]:
+                    modifiers.add(normalized_tag[:-3])
+        return sorted(modifiers)
+
+    def _refresh_background_suggestions(self, text=None):
+        """Refresh known modifiers while retaining the current editable value."""
+        if text is None:
+            text = self.background.currentText()
+        self.background.blockSignals(True)
+        self.background.clear()
+        self.background.addItems(self._unique_background_modifiers())
+        self.background.setCurrentText(text)
+        self.background.blockSignals(False)
 
     def _unique_tribes(self):
         """Return unique tribe words because the renderer separates tribes by spaces."""
@@ -757,6 +786,15 @@ class CardEditor(QWidget):
             self.fields[name].setText(row.get(name, ""))
         for name in ("Temple", "Tier"):
             self.fields[name].setCurrentText(row.get(name, ""))
+        background = next(
+            (
+                tag[:-3]
+                for tag in _split(row.get("Tags", ""))
+                if tag.lower().endswith("_bg") and tag[:-3]
+            ),
+            "",
+        ).lower()
+        self.background.setCurrentText(background)
         self.art.setText(row.get("Art File", ""))
         for name in ("Power", "Health"):
             raw = row.get(name, "")
@@ -799,7 +837,9 @@ class CardEditor(QWidget):
         row["Tribes"] = self.fields["Tribes"].serialized()
         row["Token"] = _join(self.fields["Token"].values())
         row["Credit"] = self.fields["Credit"].serialized()
-        tags = [name for name, check in self.tag_checks.items() if check.isChecked()]
+        background = self.background.currentText().strip().lower()
+        tags = [f"{background}_bg"] if background else []
+        tags.extend(name for name, check in self.tag_checks.items() if check.isChecked())
         if self.extra_cell_amount.value() > 0:
             tags.append(f"{self.extra_cell_amount.value()}_extra_cell")
         row["Tags"] = _join(tags)
@@ -892,6 +932,7 @@ class CardEditor(QWidget):
             return False
         self.original = dict(row)
         self._refresh_search(row["Card Name"])
+        self._refresh_background_suggestions(self.background.currentText())
         if export:
             try:
                 image = cards.create_card(row)
@@ -918,6 +959,7 @@ class CardEditor(QWidget):
         if result != QMessageBox.Yes:
             return
         row = self.rows.pop(self.current_index)
+        self._refresh_background_suggestions()
         exports = ROOT / "exports" / "cards"
         if QMessageBox.question(self, "Delete exports?", "Also delete exports for this card?",
                                 QMessageBox.Yes | QMessageBox.No) == QMessageBox.Yes:

@@ -25,10 +25,12 @@ from .gui_helpers import Gemification, NoWheelComboBox, ROOT, _split, _join
 SIGIL_PATH = ROOT / DEFAULT_CONFIG["sigils_file_path"]
 TRAIT_PATH = ROOT / DEFAULT_CONFIG["traits_file_path"]
 SIGIL_ICON_DIR = ROOT / DEFAULT_CONFIG["assets_dir"] / "general_assets" / "sigils"
+CONDUIT_SIGIL_ICON_DIR = ROOT / DEFAULT_CONFIG["assets_dir"] / "general_assets" / "conduit_sigil_indicators"
 
 SIGIL_TAG_OPTIONS = [
     "power_sigil",
     "health_sigil",
+    "conduit_sigil",
     "mox_green",
     "mox_orange",
     "mox_blue",
@@ -149,6 +151,16 @@ class SigilTraitEditor(QWidget):
         colorless_icon_row.addWidget(colorless_choose_icon)
         colorless_icon_row.addWidget(colorless_delete_icon)
         form.addRow("Colorless Icon", colorless_icon_row)
+
+        self.conduit_icon_edit = QLineEdit()
+        self.conduit_icon_edit.setReadOnly(True)
+        conduit_choose_icon = QPushButton("Choose conduit image...")
+        conduit_choose_icon.clicked.connect(lambda: self._choose_icon(conduit=True))
+        self.conduit_icon_row = QWidget()
+        conduit_icon_layout = QHBoxLayout(self.conduit_icon_row)
+        conduit_icon_layout.setContentsMargins(0, 0, 0, 0)
+        conduit_icon_layout.addWidget(self.conduit_icon_edit, 1)
+        conduit_icon_layout.addWidget(conduit_choose_icon)
         
         self.tags = QWidget()
         tags_layout = QVBoxLayout(self.tags)
@@ -160,6 +172,8 @@ class SigilTraitEditor(QWidget):
             self.tag_checks[tag] = check
             tags_layout.addWidget(check)
         form.addRow("Tags", self.tags)
+        form.addRow("Conduit image", self.conduit_icon_row)
+        self.conduit_icon_label = form.labelForField(self.conduit_icon_row)
 
         scroll.setWidget(body)
         outer.addWidget(scroll)
@@ -210,6 +224,7 @@ class SigilTraitEditor(QWidget):
 
     def _switch_section(self, section):
         self.current_section = section
+        self._update_conduit_icon_visibility()
         self._refresh_search()
 
     def _refresh_search(self, text=""):
@@ -262,12 +277,27 @@ class SigilTraitEditor(QWidget):
         self.icon_edit.setText(icon_path.name if icon_name and icon_path.is_file() else "")
         icon_path = SIGIL_ICON_DIR / f"{icon_name}_outline.png"
         self.colorless_icon_edit.setText(icon_path.name if icon_name and icon_path.is_file() else "")
+        conduit_icon_path = CONDUIT_SIGIL_ICON_DIR / f"{row.get('Name', '').replace(' ', '')}.png"
+        self.conduit_icon_edit.setText(
+            conduit_icon_path.name if row.get("Name") and conduit_icon_path.is_file() else ""
+        )
 
         tags = set(_split(row.get("Tags", "")))
         for tag, check in self.tag_checks.items():
             check.setChecked(tag in tags)
         self.loading = False
+        self._update_conduit_icon_visibility()
         self._update_preview_visibility()
+
+    def _update_conduit_icon_visibility(self):
+        """Offer conduit-image selection only for conduit sigils."""
+        is_conduit = (
+            self.current_section == "Sigils"
+            and self.type_combo.currentText() == "Sigil"
+            and self.tag_checks["conduit_sigil"].isChecked()
+        )
+        self.conduit_icon_row.setVisible(is_conduit)
+        self.conduit_icon_label.setVisible(is_conduit)
 
     def _update_preview_visibility(self):
         item_type = self.type_combo.currentText()
@@ -288,6 +318,7 @@ class SigilTraitEditor(QWidget):
 
     def _changed(self):
         if not self.loading:
+            self._update_conduit_icon_visibility()
             self._update_preview_visibility()
             self._render_preview()
 
@@ -382,17 +413,25 @@ class SigilTraitEditor(QWidget):
 
         return QPixmap.fromImage(ImageQt(image)).scaled(320, 420, Qt.KeepAspectRatio, Qt.SmoothTransformation)
 
-    def _choose_icon(self, colorless=False):
+    def _choose_icon(self, colorless=False, conduit=False):
         name = self.name_edit.text().strip()
-        icon_to_edit = self.colorless_icon_edit if colorless else self.icon_edit
+        icon_to_edit = (
+            self.conduit_icon_edit
+            if conduit
+            else self.colorless_icon_edit
+            if colorless
+            else self.icon_edit
+        )
         if not name:
             QMessageBox.warning(self, "Missing name", "Enter a name before choosing an icon.")
             return
 
+        icon_dir = CONDUIT_SIGIL_ICON_DIR if conduit else SIGIL_ICON_DIR
+        title = "Choose conduit image" if conduit else "Choose sigil icon"
         filename, _ = QFileDialog.getOpenFileName(
             self,
-            "Choose sigil icon",
-            str(SIGIL_ICON_DIR),
+            title,
+            str(icon_dir),
             "Images (*.png *.jpg *.jpeg *.bmp *.webp)",
         )
         if not filename:
@@ -400,15 +439,16 @@ class SigilTraitEditor(QWidget):
 
         source = Path(filename)
         outline = "_outline" if colorless else ""
-        target = SIGIL_ICON_DIR / f"{_normalize_sigil_name(name)}{outline}.png"
+        target_name = name.replace(" ", "") if conduit else _normalize_sigil_name(name)
+        target = icon_dir / f"{target_name}{outline}.png"
         if source.resolve() == target.resolve():
             icon_to_edit.setText(str(target.name))
             return
         if target.exists() and source.resolve() != target.resolve():
             result = QMessageBox.warning(
                 self,
-                "Overwrite icon?",
-                f"Replace the existing {target.name} icon in the sigil asset folder?",
+                "Overwrite image?",
+                f"Replace the existing {target.name} image?",
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.No,
             )

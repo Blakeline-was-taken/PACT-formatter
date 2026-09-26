@@ -3,8 +3,13 @@
 from pathlib import Path
 
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLineEdit, QPushButton, QWidget
-
+from PySide6.QtWidgets import (
+    QComboBox,
+    QHBoxLayout,
+    QLineEdit,
+    QPushButton,
+    QWidget
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 
