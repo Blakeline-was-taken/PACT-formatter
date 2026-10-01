@@ -249,6 +249,8 @@ The formatter contains three separate rendering formats to ensure content fits c
 * **`power_coord` / `health_coord`**: Fixed points for drawing the stats.
 * **`extra_cells_top_border` / `extra_cells_left_border`**: Fixed top-left point position for drawing extra cells.
 * **`tribes_top_border` / `tribes_left_border`**: Fixed top-left point position for drawing tribe icons.
+* **`left_symbol` / `right-symbol`**: Fixed bottom-left and bottom-right positions for drawing sigil symbols.
+* **`colorless_symbols`**: Toggles whether sigil symbols should use their colorless `_outline` variants or not. 
 
 ### Gemification, Patch & Conditional Bounds
 
