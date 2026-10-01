@@ -23,9 +23,9 @@ class Cost:
     def addAsterisk(self, image: Image.Image) -> Image:
         if self.asterisk:
             asterisk_img = Image.open("assets/general_assets/costs/asterisk.png")
-            final_image = Image.new('RGBA', (image.width + asterisk_img.width - 1, max(image.height, asterisk_img.height)))
+            final_image = Image.new('RGBA', (image.width + asterisk_img.width + DEFAULT_CONFIG['asterisk_right_displacement'], max(image.height, asterisk_img.height)))
             final_image.paste(image, (0, final_image.height - image.height))
-            final_image.paste(asterisk_img, (image.width - 1, 0), mask=asterisk_img)
+            final_image.paste(asterisk_img, (image.width + DEFAULT_CONFIG['asterisk_right_displacement'], 0), mask=asterisk_img)
             image = final_image
         return image
 
@@ -66,10 +66,10 @@ class Blood(Cost):
     def getCostImage(self) -> Image:
         cost_img = Image.open(f"assets/general_assets/costs/blood/blood.png").convert("RGBA")
 
-        total_width = cost_img.width * self.amount
+        total_width = cost_img.width * self.amount + DEFAULT_CONFIG['blood_right_displacement'] * (self.amount - 1)
         final_img = Image.new('RGBA', (total_width, cost_img.height))
         for i in range(self.amount):
-            x_offset = i * cost_img.width
+            x_offset = i * cost_img.width + i * DEFAULT_CONFIG['blood_right_displacement']
             final_img.paste(cost_img, (x_offset, 0))
 
         return self.addAsterisk(final_img)
@@ -102,14 +102,11 @@ class Bones(Cost):
     def getCostImage(self) -> Image:
         bone_img = Image.open("assets/general_assets/costs/bones/bone.png").convert("RGBA")
         if self.amount <= 4: # No need for numbers
-            duplicate_bone = bone_img.copy()
-            final_width = bone_img.width + (duplicate_bone.width - 1) * (self.amount - 1)
+            final_width = bone_img.width * self.amount + DEFAULT_CONFIG['bone_right_displacement'] * (self.amount - 1)
             final_image = Image.new('RGBA', (final_width, bone_img.height))
-            final_image.paste(bone_img, (0, 0))
-
-            for i in range(self.amount - 1):
-                paste_position = (bone_img.width + (duplicate_bone.width - 1) * i - 1, 0)
-                final_image.paste(duplicate_bone, paste_position, duplicate_bone)
+            for i in range(self.amount):
+                x_offset = i * bone_img.width + i * DEFAULT_CONFIG['bone_right_displacement']
+                final_image.paste(bone_img, (x_offset, 0), bone_img)
 
         else: # Need numbers
             digits = list(str(self.amount))
@@ -312,20 +309,15 @@ class Gems(Cost):
             for _ in range(int(gem.split(" ")[0])):
                 gem_images.append(image)
 
-        total_width = sum(img.width for img in gem_images) - (len(gem_images) - 1)
+        total_width = sum(img.width for img in gem_images) + DEFAULT_CONFIG['gem_right_displacement'] * (len(gem_images) - 1)
         max_height = max(img.height for img in gem_images)
 
         cost_image = Image.new("RGBA", (total_width, max_height), (255, 255, 255, 0))
 
         offset = 0
         for img in gem_images:
-            if img.height == 90 and img.height != max_height:
-                paste_position = (offset, 1)
-            else:
-                paste_position = (offset, 0)
-
-            cost_image.paste(img, paste_position, mask=img)
-            offset += img.width - 1
+            cost_image.paste(img, (offset, int(img.height == 90 and img.height != max_height)), img)
+            offset += img.width + DEFAULT_CONFIG['gem_right_displacement']
         return self.addAsterisk(cost_image)
 
     @classmethod

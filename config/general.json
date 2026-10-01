@@ -66,9 +66,14 @@
     "trait_vertical_spacing": 0,
 
     "cost_right_border": 99,
-    "cost_right_border_gemification_displacement": 2,
+    "cost_right_border_gemification_displacement": -2,
     "cost_left_border": 67,
     "cost_bottom_border": 91,
+
+    "asterisk_right_displacement": -1,
+    "blood_right_displacement": 0,
+    "bone_right_displacement": -1,
+    "gem_right_displacement": -1,
 
     "name_top_border": 138,
     "name_left_border": 138,

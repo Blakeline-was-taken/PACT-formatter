@@ -187,7 +187,8 @@ These two sheets define the sub-components of the cards. Both utilize identical 
   * *`{icon:IconName}`*: Inserts decorative indicators or icon graphics directly inside the flowing text field.
 * **`Tags`**: Diagnostic metadata values.
     * *`power_sigil` / `health_sigil`*: Replaces the number on the power or health or both and substitutes the entire value zone with its sigil icon using `power_sigil_center` and `health_sigil_center` to dictate where it goes.
-    * *`mox_[color]`* (e.g., `mox_green`, `mox_orange`, `mox_blue`, `mox_prism`) : adds a gem to the mox indicator if the card the sigil is printed onto has one.
+    * *`conduit_sigil`*: Adds a sigil conduit indicator if one with the same name as this sigil's icon is present in the `assets/general_assets/conduit_sigil_indicators/` folder.
+    * *`mox_[color]`* (e.g., `mox_green`, `mox_orange`, `mox_blue`, `mox_prism`): Adds a gem to the mox indicator if the card the sigil is printed onto has one.
 
 ---
 
@@ -239,6 +240,7 @@ The formatter contains three separate rendering formats to ensure content fits c
 
 * **`cost_right_border` / `cost_left_border` / `cost_bottom_border`**: A bounding box that dictates exactly where the card cost renders.
 * **`cost_right_border_gemification_displacement`**: Adjusts the right-hand layout margin when costs feature gemification.
+* **`*_right_displacement`**: Adjusts how much the next cost image in a given cost should shift to the right when placed.
 * **`name_top_border` / `name_left_border` / `flavor_text_top_border` / `flavor_text_left_border` / `metadata_top_border` / `art_credit_top_border`**: Fixed positions for text labels.
 * **`indicator_displacement`**: An offset value that shifts flavor text and sigils downwards if an indicator (like conduit or mox) is present.
 * **`sigil_top_border` / `sigil_left_border` / `sigil_bottom_border`**: Establishes the layout space for rendering sigils and traits.
