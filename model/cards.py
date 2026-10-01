@@ -28,6 +28,12 @@ def get_cardback(temple, tier, bg_modifier=None):
 def get_empty_cardback_bottom(temple, tier, bg_modifier=None):
     return get_card_asset("bg_emptybottom", "cardbacks", temple, tier, bg_modifier)
 
+def get_symbol(temple, tier, bg_modifier=None, right=False):
+    if right:
+        return get_card_asset("right_symbol", "cardbacks", temple, tier, bg_modifier)
+    else:
+        return get_card_asset("left_symbol", "cardbacks", temple, tier, bg_modifier)
+
 def get_vanilla_gemification(temple, tier, bg_modifier=None):
     return get_card_asset("vanilla_gemify", "extras/gemification", temple, tier, bg_modifier)
 
@@ -206,6 +212,29 @@ def print_tribes(config, image, csv_dict, bg_modifier=None):
                 tribe_icon = tribe_icon.resize((tribe_icon.width * 5, tribe_icon.height * 5), Image.NEAREST)
                 image.paste(tribe_icon, (config['tribes_left_border'], pos_y), tribe_icon)
                 pos_y += tribe_icon.height - 5
+
+
+def print_symbols(config, image, csv_dict, bg_modifier=None):
+    symbols = [False, False] # Left symbol, Right symbol
+
+    for tag in csv_dict["Tags"].split(","):
+        if "symbol" in tag:
+            right_symbol = "right" in tag
+            if symbols[right_symbol]: # If the symbol has already been added, skip it
+                continue
+
+            tag_sigil = tag.split("_")[0].strip()
+            if tag_sigil in sigils.SIGILS:
+                tag_sigil = sigils.SIGILS[tag_sigil].copy()
+                symbols[right_symbol] = True
+                
+                symbol = get_symbol(csv_dict['Temple'], csv_dict['Tier'], bg_modifier, right_symbol).resize(image.size, Image.NEAREST)
+                image.paste(symbol, (0, 0), symbol)
+                coord = config[f'{"right" if right_symbol else "left"}_symbol']
+                coord = (coord[0] - tag_sigil.sigilImage().width // 2, coord[1] - tag_sigil.sigilImage().height // 2)
+                sigil_img = tag_sigil.sigilImage(color=(0, 0, 0) if config['colorless_symbols'] else 'black')
+                image = paste_sigil(image, sigil_img, coord)
+    return image
 
 
 def paste_sigil(image, sigil_img, box):
@@ -698,6 +727,9 @@ def create_card(csv_dict):
 
     # Add tribe icons
     print_tribes(config, image, csv_dict, bg_modifier)
+
+    # Add symbols
+    image = print_symbols(config, image, csv_dict, bg_modifier)
 
     # TODO: Temple/rarity-based values
     draw = ImageDraw.Draw(image)

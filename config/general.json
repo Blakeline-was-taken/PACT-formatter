@@ -93,6 +93,10 @@
     "power_coord": [198, 885],
     "health_coord": [895, 225],
 
+    "left_symbol": [130, 1440],
+    "right_symbol": [1000, 1440],
+    "colorless_symbols": true,
+
     "gemification_health_top_border": 17,
     "gemification_health_horizontal_center": 101,
     "gemification_health_text_top_border": 105,
