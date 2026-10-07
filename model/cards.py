@@ -400,16 +400,30 @@ def write_name(config, image, draw, csv_dict):
 
 
 def write_flavor_text(config, color_map, image, draw, csv_dict, need_displacement):
-    flavor_text = csv_dict["Flavor Text"].replace("\r", "").replace("\n", " ")
+    flavor_text = csv_dict["Flavor Text"]
     flavor_font = ImageFont.truetype(FONT, config['flavor_text_font_size'])
+    flavor_text_y = config['flavor_text_top_border'] + (config['indicator_displacement'] if need_displacement else 0)
     if flavor_text != "":
-        while draw.textlength(flavor_text, font=flavor_font) > config['flavor_text_max_width']:
-            limit = flavor_text.rfind(" ") if " " in flavor_text else -6
-            flavor_text = flavor_text[:limit] + "..."
-            flavor_text += "''" if "''" in flavor_text else ""
-        flavor_text_x = config['flavor_text_left_border'] + (config['flavor_text_max_width'] - draw.textlength(flavor_text, font=flavor_font)) // 2
-        flavor_text_y = config['flavor_text_top_border'] + (config['indicator_displacement'] if need_displacement else 0)
-        draw.text((flavor_text_x, flavor_text_y), flavor_text, fill=color_map["flavor_text_color"], font=flavor_font)
+        lines = [""]
+        current_line = 0
+        for word in flavor_text.split(" "):
+            space = " " if lines[current_line] != "" else ""
+            if word == "\\n":
+                current_line += 1
+                lines.append("")
+            elif draw.textlength(lines[current_line] + space + word, font=flavor_font) <= config['flavor_text_right_border'] - config['flavor_text_left_border']:
+                lines[current_line] = lines[current_line] + space + word
+            else:
+                current_line += 1
+                lines.append(word)
+        
+        for line in lines:
+            flavor_text_x = (config['flavor_text_left_border'] + config['flavor_text_right_border'] - draw.textlength(line, font=flavor_font)) // 2
+            draw.text((flavor_text_x, flavor_text_y), line, fill=color_map["flavor_text_color"], font=flavor_font)
+            flavor_text_y += config['flavor_text_font_size']
+    else:
+        flavor_text_y += config['flavor_text_font_size']  # Add a line height even if there's no flavor text to maintain spacing
+    return flavor_text_y + config['sigil_top_displacement']
 
 
 def write_metadata(config, color_map, image, draw, csv_dict):
@@ -735,8 +749,8 @@ def create_card(csv_dict):
     draw = ImageDraw.Draw(image)
     # Write the name
     write_name(config, image, draw, csv_dict)
-    # Write the flavor text
-    write_flavor_text(config, color_map, image, draw, csv_dict, need_displacement)
+    # Write the flavor text and get the top border for sigils
+    sigil_y = write_flavor_text(config, color_map, image, draw, csv_dict, need_displacement)
     # Write the metadata
     if config['write_card_metadata']:
         write_metadata(config, color_map, image, draw, csv_dict)
@@ -748,9 +762,6 @@ def create_card(csv_dict):
     if not conduit_sigil and "conduit_sigil_indicator" in csv_dict["Tags"]:
         conduit_sigil = "NullConduit"
 
-    success = False
-    sigil_y = config['sigil_top_border'] + (config['indicator_displacement'] if need_displacement else 0)
-
     # Print the sigil conduit indicator
     if config['show_conduit_sigil_indicators'] and conduit_sigil:
         try:
@@ -761,6 +772,7 @@ def create_card(csv_dict):
         except (FileNotFoundError, PermissionError):
             logging.warning(f'Warning: Conduit sigil indicator "assets/general_assets/conduit_sigil_indicators/{conduit_sigil}.png" not found.')
 
+    success = False
     # Try default formatting
     if config['allow_default_formatting']:
         image_default = print_card_sigils_and_traits(config, color_map, bg_modifier, image, sigil_y, csv_dict, sigil_list, trait_list, use_shortened_format=False)

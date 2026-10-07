@@ -32,7 +32,6 @@
     "name_font_size": 110,
     "name_max_width": 870,
     "flavor_text_font_size": 45,
-    "flavor_text_max_width": 700,
     "metadata_font_size": 45,
     "art_credit_font_size": 45,
     "sigil_name_font_size": 55,
@@ -84,7 +83,8 @@
 
     "flavor_text_top_border": 962,
     "flavor_text_left_border": 300,
-    "sigil_top_border": 1010,
+    "flavor_text_right_border": 1000,
+    "sigil_top_displacement": 3,
     "sigil_left_border": 120,
     "sigil_bottom_border": 1430,
     
