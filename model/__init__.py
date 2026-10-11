@@ -2,34 +2,44 @@ import logging, json, os
 from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parent.parent
+
 def load_config(temple=None, tier=None, bg_modifier=None):
+    config_tree = json.load(open(ROOT / "config.json", "r", encoding="utf-8"))
+
+    default_temple = config_tree["default"]
+    temple = temple.lower() if temple else "default"
+    temple_config = config_tree.get(temple, default_temple)
+    tier = tier.lower() if tier else "default"
+    bg_modifier = bg_modifier.lower() if bg_modifier else "default"
     config = {}
-    files_to_load = ["general"]
-    if temple:
-        files_to_load.append(temple.lower())
-    for filename in files_to_load:
-        path = f"config/{filename}.json"
-        if os.path.exists(path):
-            with open(path, "r") as f:
-                config.update(json.load(f))
 
-    # If no background modifier is passed, we assume it's the "default" background
-    active_bg = bg_modifier if bg_modifier else "default"
-    tier_lower = tier.lower() if tier else None
+    def apply_section(section):
+        if isinstance(section, dict):
+            config.update(section)
 
-    if "overrides" in config and active_bg in config["overrides"]:
-        bg_config = config["overrides"][active_bg]
-        # 1. Apply the base shifts for this specific background type
-        if "default" in bg_config and isinstance(bg_config["default"], dict):
-            config.update(bg_config["default"])
-        # 2. Apply the rarity-specific shifts for this background type
-        if tier_lower and tier_lower in bg_config:
-            config.update(bg_config[tier_lower])
+    apply_section(default_temple["default"]["default"])
+    
+    if temple != "default":
+        apply_section(temple_config.get("default", {}).get("default"))
+
+    if tier:
+        apply_section(default_temple.get(tier, {}).get("default"))
+        if temple != "default":
+            apply_section(temple_config.get(tier, {}).get("default"))
+
+    if bg_modifier != "default":
+        apply_section(default_temple["default"].get(bg_modifier))
+        if temple != "default":
+            apply_section(temple_config.get("default", {}).get(bg_modifier))
+        if tier:
+            apply_section(default_temple.get(tier, {}).get(bg_modifier))
+            if temple != "default":
+                apply_section(temple_config.get(tier, {}).get(bg_modifier))
 
     return config
 
 DEFAULT_CONFIG = load_config()
-ROOT = Path(__file__).resolve().parent.parent
 ASSETS_DIR = ROOT / DEFAULT_CONFIG["assets_dir"]
 GENERAL_ASSETS_DIR = ASSETS_DIR / "general_assets"
 FONT = ROOT / "data" / "fonts" / f"{DEFAULT_CONFIG["font"]}.TTF"
@@ -46,7 +56,7 @@ def get_color_mapping(temple, tier=None, bg_modifier=None):
     Loads and returns the color mapping dictionary for a specific temple and tier.
     Maps general color keys (from general_assets/colors.png) to temple/tier-specific colors.
     """
-    temple_name = temple.lower()
+    temple = temple.lower()
     tier_name = tier.lower() if tier else None
     
     # Clean up the bg_modifier
@@ -65,7 +75,7 @@ def get_color_mapping(temple, tier=None, bg_modifier=None):
     # Find the first file in the list that actually exists
     color_path = None
     for filename in filenames_to_check:
-        path = ASSETS_DIR / temple_name / filename
+        path = ASSETS_DIR / temple / filename
         if os.path.exists(path):
             color_path = path
             break
