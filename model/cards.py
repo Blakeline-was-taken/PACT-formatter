@@ -7,6 +7,7 @@ from model import (
     logging,
     ROOT, ASSETS_DIR, GENERAL_ASSETS_DIR, FONT, DEFAULT_CONFIG
 )
+from model.text import draw_rich_text, measure_rich_text
 
 def get_card_asset(asset_name, default_folder, temple, tier=None, bg_modifier=None):
     prefixes = []
@@ -175,7 +176,7 @@ def print_card_cost(config, image, csv_dict):
     cost_x = config['cost_right_border']
     if "_" in cost:
         cost = cost.lower().split("_").pop()
-        cost_x -= config["cost_right_border_gemification_displacement"]
+        cost_x += config["cost_right_border_gemification_displacement"]
         
     cost_images = []
     for c in costs.get_cost(cost):
@@ -245,7 +246,7 @@ def print_symbols(config, image, csv_dict, bg_modifier=None):
 
 def paste_sigil(image, sigil_img, box):
     sigil_img_trans = Image.new("RGBA", image.size)
-    sigil_img_trans.paste(sigil_img, box, mask=sigil_img)
+    sigil_img_trans.paste(sigil_img, box)
     new_img = Image.alpha_composite(image, sigil_img_trans)
     return new_img
 
@@ -274,7 +275,7 @@ def print_card_sigils_and_traits(config, color_map, bg_modifier, image, sigil_y,
             overlay = paste_sigil(overlay, sigil_img, (0, sigil_y))
             sigil_y -= sigil.bottom_displacement
         else:
-            sigil_img = sigil.getImage(shortened_format=use_shortened_format)
+            sigil_img = sigil.getImage(shortened_format=use_shortened_format, config=config, color_map=color_map)
             if sigil_y + sigil_img.height > image.height:
                 # If the sigil would go off the bottom of the card, return None to indicate failure
                 return None
@@ -294,7 +295,7 @@ def print_card_sigils_and_traits(config, color_map, bg_modifier, image, sigil_y,
         trait_images = []
         trait_height = traitline_img.height + config['traitline_vertical_spacing']
         for trait in trait_list:
-            trait_img = trait.getImage(color=color_map["trait_color"])
+            trait_img = trait.getImage(color=color_map["trait_color"], config=config, color_map=color_map)
             trait_height += trait_img.height + config['trait_vertical_spacing']
             trait_images.append(trait_img)
 
@@ -315,10 +316,10 @@ def print_card_sigils_and_traits(config, color_map, bg_modifier, image, sigil_y,
             else:
                 trait_y = sigil_y - (sigil_y % 10) + 10
 
-        overlay.paste(traitline_img, ((overlay.width - traitline_img.width) // 2, trait_y), traitline_img)
+        overlay.paste(traitline_img, ((overlay.width - traitline_img.width) // 2, trait_y))
         trait_y += traitline_img.height + config['traitline_vertical_spacing']
         for trait_img in trait_images:
-            overlay.paste(trait_img, (sigil_x, trait_y), trait_img)
+            overlay.paste(trait_img, (sigil_x, trait_y))
             trait_y += trait_img.height + config['trait_vertical_spacing']
 
     return Image.alpha_composite(image, overlay)
@@ -333,7 +334,7 @@ def print_base_game_card(config, color_map, bg_modifier, image, sigil_y, csv_dic
         trait_images = []
         trait_height = traitline_img.height + config['traitline_vertical_spacing']
         for trait in trait_list:
-            trait_img = trait.getImage(color=color_map["trait_color"])
+            trait_img = trait.getImage(color=color_map["trait_color"], config=config, color_map=color_map)
             trait_height += trait_img.height + config['trait_vertical_spacing']
             trait_images.append(trait_img)
 
@@ -343,7 +344,7 @@ def print_base_game_card(config, color_map, bg_modifier, image, sigil_y, csv_dic
     sigil_heights = [0]
     current_row_width = 0
     for sigil in sigil_list:
-        sigil_img = sigil.getImage(base_game=True)
+        sigil_img = sigil.getImage(base_game=True, config=config, color_map=color_map)
         if current_row_width + sigil_img.width > size:
             sigil_rows.append([])
             sigil_heights.append(0)
@@ -376,33 +377,35 @@ def print_base_game_card(config, color_map, bg_modifier, image, sigil_y, csv_dic
         space_between = free_space / (num_sigils + 1) if num_sigils > 0 else 0
         row_x = sigil_left + space_between
         for sigil_img in row:
-            overlay.paste(sigil_img, (int(row_x), sigil_y), sigil_img)
+            overlay.paste(sigil_img, (int(row_x), sigil_y))
             row_x += sigil_img.width + space_between
         sigil_y += sigil_heights[row_index] + config['sigil_vertical_spacing']
 
     if len(trait_list) > 0:
-        overlay.paste(traitline_img, ((overlay.width - traitline_img.width) // 2, trait_y), traitline_img)
+        overlay.paste(traitline_img, ((overlay.width - traitline_img.width) // 2, trait_y))
         trait_y += traitline_img.height + config['traitline_vertical_spacing']
         for trait_img in trait_images:
-            overlay.paste(trait_img, (sigil_left, trait_y), trait_img)
+            overlay.paste(trait_img, (sigil_left, trait_y))
             trait_y += trait_img.height + config['trait_vertical_spacing']
 
     return Image.alpha_composite(image, overlay)
 
 
-def write_name(config, image, draw, csv_dict):
+def write_name(config, color_map, image, draw, csv_dict):
     name_size = config['name_font_size']
     name_y = config['name_top_border']
     name_font = ImageFont.truetype(FONT, name_size)
-    while draw.textlength(csv_dict["Card Name"], font=name_font) > config['name_max_width']:
+    name_width = measure_rich_text(csv_dict["Card Name"], name_font, "black", color_map, config)
+    while name_width > config['name_max_width']:
         name_size -= 1
         name_font = ImageFont.truetype(FONT, name_size)
+        name_width = measure_rich_text(csv_dict["Card Name"], name_font, "black", color_map, config)
         name_y += 0.5
     if config["center_card_name"]:
-        name_x = (image.width - draw.textlength(csv_dict["Card Name"], font=name_font)) // 2
+        name_x = (image.width - name_width) // 2
     else:
         name_x = config["name_left_border"]
-    draw.text((name_x, int(name_y)), csv_dict["Card Name"], fill="black", font=name_font)
+    draw_rich_text(image, csv_dict["Card Name"], name_font, (name_x, int(name_y)), "black", color_map, config)
 
 
 def write_flavor_text(config, color_map, image, draw, csv_dict, need_displacement):
@@ -410,23 +413,12 @@ def write_flavor_text(config, color_map, image, draw, csv_dict, need_displacemen
     flavor_font = ImageFont.truetype(FONT, config['flavor_text_font_size'])
     flavor_text_y = config['flavor_text_top_border'] + (config['indicator_displacement'] if need_displacement else 0)
     if flavor_text != "":
-        lines = [""]
-        current_line = 0
-        for word in flavor_text.split(" "):
-            space = " " if lines[current_line] != "" else ""
-            if word == "\\n":
-                current_line += 1
-                lines.append("")
-            elif draw.textlength(lines[current_line] + space + word, font=flavor_font) <= config['flavor_text_right_border'] - config['flavor_text_left_border']:
-                lines[current_line] = lines[current_line] + space + word
-            else:
-                current_line += 1
-                lines.append(word)
-        
-        for line in lines:
-            flavor_text_x = (config['flavor_text_left_border'] + config['flavor_text_right_border'] - draw.textlength(line, font=flavor_font)) // 2
-            draw.text((flavor_text_x, flavor_text_y), line, fill=color_map["flavor_text_color"], font=flavor_font)
-            flavor_text_y += config['flavor_text_font_size']
+        text_width = config['flavor_text_right_border'] - config['flavor_text_left_border']
+        _, text_height, _ = draw_rich_text(
+            image, flavor_text, flavor_font, (config['flavor_text_left_border'], flavor_text_y), color_map["flavor_text_color"],
+            color_map, config, max_width=text_width, align="center"
+        )
+        flavor_text_y += text_height
     else:
         flavor_text_y += config['flavor_text_font_size']  # Add a line height even if there's no flavor text to maintain spacing
     return flavor_text_y + config['sigil_top_displacement']
@@ -442,19 +434,23 @@ def write_metadata(config, color_map, image, draw, csv_dict):
             description += tribe + " "
         description = description[:-1]
     desc_y = config['metadata_top_border']
-    desc_x = (image.width - draw.textlength(description, font=metadata_font)) // 2
-    draw.text((desc_x, desc_y), description, fill=color_map["metadata_color"], font=metadata_font)
+    draw_rich_text(
+        image, description, metadata_font, (0, desc_y), color_map["metadata_color"],
+        color_map, config, max_width=image.width, align="center"
+    )
 
 
 def write_art_credit(config, color_map, image, draw, csv_dict):
     art_credit_font = ImageFont.truetype(FONT, config['art_credit_font_size'])
     artist_text = f"Art by {csv_dict['Credit']}"
     desc_y = config['art_credit_top_border']
-    desc_x = (image.width - draw.textlength(artist_text, font=art_credit_font)) // 2
-    draw.text((desc_x, desc_y), artist_text, color_map["art_credit_color"], font=art_credit_font)
+    draw_rich_text(
+        image, artist_text, art_credit_font, (0, desc_y), color_map["art_credit_color"],
+        color_map, config, max_width=image.width, align="center"
+    )
 
 
-def write_stats(config, image, csv_dict, power_sigil, health_sigil, bg_modifier):
+def write_stats(config, color_map, image, csv_dict, power_sigil, health_sigil, bg_modifier):
     stats_font = ImageFont.truetype(FONT, config['stats_font_size'])
     
     if power_sigil and config['show_power_sigil']:
@@ -464,8 +460,7 @@ def write_stats(config, image, csv_dict, power_sigil, health_sigil, bg_modifier)
         power = csv_dict["Power"]
         if "_" in power:
             power = power.lower().split("_").pop()
-        draw = ImageDraw.Draw(image)
-        draw.text(config['power_coord'], power, fill="black", font=stats_font)
+        draw_rich_text(image, power, stats_font, config['power_coord'], "black", color_map, config)
 
     if health_sigil and config['show_health_sigil']:
         health_center = config['health_sigil_center']
@@ -474,19 +469,18 @@ def write_stats(config, image, csv_dict, power_sigil, health_sigil, bg_modifier)
         health = csv_dict["Health"]
         if "_" in health:
             health = health.lower().split("_").pop()
-        draw = ImageDraw.Draw(image)
-        draw.text(config['health_coord'], health, fill="black", font=stats_font)
+        draw_rich_text(image, health, stats_font, config['health_coord'], "black", color_map, config)
 
     return image
 
 
-def write_stat_gemification_text(config, image, draw, csv_dict):
+def write_stat_gemification_text(config, color_map, image, draw, csv_dict):
     gemification_font = ImageFont.truetype(FONT, config['gemification_font_size'])
     for stat in ["Health", "Power", "Cost"]:
         if "_" in csv_dict[stat]:
             text = csv_dict[stat].split("_")[-2]
-            text_x = config[f'gemification_{stat.lower()}_text_horizontal_center'] - (draw.textlength(text, font=gemification_font) // 2)
-            draw.text((text_x, config[f'gemification_{stat.lower()}_text_top_border']), text, fill="black", font=gemification_font)
+            text_x = config[f'gemification_{stat.lower()}_text_horizontal_center'] - (measure_rich_text(text, gemification_font, "black", color_map, config) // 2)
+            draw_rich_text(image, text, gemification_font, (text_x, config[f'gemification_{stat.lower()}_text_top_border']), "black", color_map, config)
 
 
 class SigilConditional():
@@ -522,7 +516,7 @@ class CellConditional(SigilConditional):
         )
 
     def getImage(self, config, color_map, temple, tier, bg_modifier, use_shortened_format=False):
-        sigil_img = self.sigil.getImage(shortened_format=use_shortened_format)
+        sigil_img = self.sigil.getImage(shortened_format=use_shortened_format, config=config, color_map=color_map)
         if sigil_img.height < config["cell_sigil_small_max_height"]:
             patch_image = get_card_asset("cell", "extras/conditionals", temple, tier, bg_modifier)
         elif sigil_img.height < config["cell_sigil_medium_max_height"]:
@@ -552,7 +546,7 @@ class LatcherConditional(SigilConditional):
         )
 
     def getImage(self, config, color_map, temple, tier, bg_modifier, use_shortened_format=False):
-        sigil_img = self.sigil.getImage(shortened_format=use_shortened_format)
+        sigil_img = self.sigil.getImage(shortened_format=use_shortened_format, config=config, color_map=color_map)
         if sigil_img.height < config["latch_sigil_small_max_height"]:
             patch_image = get_card_asset("latch", "extras/conditionals", temple, tier, bg_modifier)
         elif sigil_img.height < config["latch_sigil_medium_max_height"]:
@@ -582,10 +576,7 @@ class HintConditional(SigilConditional):
         super().__init__(sigil)
     
     def getImage(self, config, color_map, temple, tier, bg_modifier, use_shortened_format=False):
-        sigil_img = self.sigil.getImage(
-            color=color_map["hint_color"],
-            shortened_format=use_shortened_format
-        )
+        sigil_img = self.sigil.getImage(color=color_map["hint_color"], shortened_format=use_shortened_format, config=config, color_map=color_map)
         patch_image = Image.new("RGBA", (sigil_img.width + config["sigil_left_border"], sigil_img.height), (0, 0, 0, 0))
         return paste_sigil(patch_image, sigil_img, (config["sigil_left_border"], 0))
 
@@ -610,7 +601,7 @@ class GemifyConditional(SigilConditional):
         )
 
     def getImage(self, config, color_map, temple, tier, bg_modifier, use_shortened_format=False):
-        sigil_img = self.sigil.getImage(shortened_format=use_shortened_format)
+        sigil_img = self.sigil.getImage(shortened_format=use_shortened_format, config=config, color_map=color_map)
         if sigil_img.height < config["gemification_sigil_small_max_height"]:
             patch_image = get_card_asset("sigil", "extras/gemification", temple, tier, bg_modifier)
         elif sigil_img.height < config["gemification_sigil_medium_max_height"]:
@@ -658,9 +649,10 @@ class ArcaneConditional(SigilConditional):
         draw = ImageDraw.Draw(patch_image)
         font = ImageFont.truetype(FONT, config["arcane_font_size"])
         text = config["arcane_text"]
-        text_x = (patch_image.width - draw.textlength(text, font=font)) // 2
-        draw.text((text_x-1, config["arcane_text_y"] + 3), text, fill=color_map["arcane_light_color"], font=font)
-        draw.text((text_x+1, config["arcane_text_y"]), text, fill=color_map["arcane_dark_color"], font=font)
+        text_width = measure_rich_text(text, font, color_map["arcane_light_color"], color_map, config)
+        text_x = (patch_image.width - text_width) // 2
+        draw_rich_text(patch_image, text, font, (text_x - 1, config["arcane_text_y"] + 3), color_map["arcane_light_color"], color_map, config)
+        draw_rich_text(patch_image, text, font, (text_x + 1, config["arcane_text_y"]), color_map["arcane_dark_color"], color_map, config)
         return patch_image
 
     @classmethod
@@ -683,9 +675,10 @@ class TribalConditional(SigilConditional):
         draw = ImageDraw.Draw(patch_image)
         font = ImageFont.truetype(FONT, config["tribal_font_size"])
         text = config["tribal_text"]
-        text_x = (patch_image.width - draw.textlength(text, font=font)) // 2
-        draw.text((text_x-1, config["tribal_text_y"] + 3), text, fill=color_map["tribal_light_color"], font=font)
-        draw.text((text_x+1, config["tribal_text_y"]), text, fill=color_map["tribal_dark_color"], font=font)
+        text_width = measure_rich_text(text, font, color_map["tribal_light_color"], color_map, config)
+        text_x = (patch_image.width - text_width) // 2
+        draw_rich_text(patch_image, text, font, (text_x - 1, config["tribal_text_y"] + 3), color_map["tribal_light_color"], color_map, config)
+        draw_rich_text(patch_image, text, font, (text_x + 1, config["tribal_text_y"]), color_map["tribal_dark_color"], color_map, config)
         return patch_image
 
     @classmethod
@@ -754,7 +747,7 @@ def create_card(csv_dict):
     # TODO: Temple/rarity-based values
     draw = ImageDraw.Draw(image)
     # Write the name
-    write_name(config, image, draw, csv_dict)
+    write_name(config, color_map, image, draw, csv_dict)
     # Write the flavor text and get the top border for sigils
     sigil_y = write_flavor_text(config, color_map, image, draw, csv_dict, need_displacement)
     # Write the metadata
@@ -803,10 +796,10 @@ def create_card(csv_dict):
         raise Exception(f"Could not fit sigils and traits on card {csv_dict['Card Name']} with any formatting option.")
 
     # Write the stats
-    image = write_stats(config, image, csv_dict, power_sigil, health_sigil, bg_modifier)
+    image = write_stats(config, color_map, image, csv_dict, power_sigil, health_sigil, bg_modifier)
 
     # Write stat gemification text if needed
     draw = ImageDraw.Draw(image)
-    write_stat_gemification_text(config, image, draw, csv_dict)
+    write_stat_gemification_text(config, color_map, image, draw, csv_dict)
 
     return image

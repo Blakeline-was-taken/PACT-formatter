@@ -40,8 +40,6 @@
                 "sigil_name_font_size": 55,
                 "sigil_description_font_size": 45,
                 "trait_description_font_size": 40,
-                "sigil_description_icon_size": 40,
-                "trait_description_icon_size": 35,
                 "stats_font_size": 110,
                 "gemification_font_size": 80,
                 "arcane_font_size": 43,
@@ -57,6 +55,70 @@
                 "tribal_dark_color_index": 6,
                 "tribal_light_color_index": 5,
                 "hint_color_index": 6,
+
+                "text_colors": {
+                    "black": {"index": 9},
+                    "bright": {"index": 8},
+                    "dark": {"index": 7},
+                    "medium": {"index": 6},
+                    "light": {"index": 5},
+
+                    "red-bright": [216, 6, 6],
+                    "red-light": [199, 87, 87],
+                    "red": [182, 20, 20],
+                    "red-dark": [121, 32, 0],
+                    "red-darkest": [69, 9, 2],
+
+                    "orange-bright": [246, 129, 37],
+                    "orange-light": [232, 150, 85],
+                    "orange": [218, 102, 39],
+                    "orange-dark": [143, 69, 23],
+                    "orange-darkest": [99, 34, 21],
+
+                    "yellow-bright": [255, 204, 21],
+                    "yellow-light": [209, 183, 94],
+                    "yellow": [204, 157, 25],
+                    "yellow-dark": [148, 130, 18],
+                    "yellow-darkest": [121, 75, 9],
+
+                    "green-bright": [129, 182, 76],
+                    "green-light": [139, 189, 106],
+                    "green": [93, 143, 48],
+                    "green-dark": [77, 125, 21],
+                    "green-darkest": [71, 78, 38],
+
+                    "blue-bright": [63, 162, 133],
+                    "blue-light": [106, 164, 189],
+                    "blue": [16, 102, 104],
+                    "blue-dark": [34, 71, 98],
+                    "blue-darkest": [3, 52, 73],
+
+                    "purple-bright": [181, 69, 191],
+                    "purple-light": [197, 117, 204],
+                    "purple": [114, 36, 133],
+                    "purple-dark": [94, 32, 94],
+                    "purple-darkest": [52, 17, 61],
+
+                    "gray-light": [162, 163, 169],
+                    "gray": [131, 127, 138],
+                    "gray-dark": [79, 76, 91],
+                    "gray-darkest": [53, 51, 61],
+
+                    "energy-bright": [117, 255, 220], 
+                    "energy": [32, 194, 175], 
+                    "energy-dark": [33, 130, 147],
+                    "overcharge": [255, 202, 3],
+
+                    "blood": [133, 29, 53],
+                    "blood-dark": [86, 33, 62],
+                    
+                    "bone-bright": [255, 238, 189],
+                    "bone": [203, 166, 113],
+                    "bone-dark": [134, 106, 81],
+
+                    "gems": [[77, 125, 21], [143, 69, 23], [16, 102, 104]],
+                    "rainbow": [[182, 20, 20], [218, 102, 39], [204, 157, 25], [93, 143, 48], [16, 102, 104], [114, 36, 133]]
+                },
 
                 "sigil_img_scale": 100,
                 "allow_colored_sigils": true,

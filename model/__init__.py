@@ -42,8 +42,7 @@ def load_config(temple=None, tier=None, bg_modifier=None):
 DEFAULT_CONFIG = load_config()
 ASSETS_DIR = ROOT / DEFAULT_CONFIG["assets_dir"]
 GENERAL_ASSETS_DIR = ASSETS_DIR / "general_assets"
-FONT = ROOT / "data" / "fonts" / f"{DEFAULT_CONFIG["font"]}.TTF"
-print(f"ROOT DIR: {ROOT}\nASSETS DIR: {ASSETS_DIR}\nGENERAL ASSETS DIR: {GENERAL_ASSETS_DIR}\nFONT PATH: {FONT}")
+FONT = ROOT / "data" / "fonts" / f"{DEFAULT_CONFIG['font']}.TTF"
 
 logging.basicConfig(
     filename='error.log', 
@@ -107,6 +106,7 @@ def get_color_mapping(temple, tier=None, bg_modifier=None):
                     mapping[ind] = colors[i]
             # Map the raw color-to-color replacement if applicable
             mapping[color_keys[i]] = colors[i]
+    mapping["palette_colors"] = colors
     return mapping
 
 
