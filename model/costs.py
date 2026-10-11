@@ -1,5 +1,7 @@
 from model import *
 
+COST_DIR = GENERAL_ASSETS_DIR / "costs"
+
 class Cost:
 
     def __init__(self):
@@ -22,7 +24,7 @@ class Cost:
 
     def addAsterisk(self, image: Image.Image) -> Image:
         if self.asterisk:
-            asterisk_img = Image.open("assets/general_assets/costs/asterisk.png")
+            asterisk_img = Image.open(COST_DIR / "asterisk.png")
             final_image = Image.new('RGBA', (image.width + asterisk_img.width + DEFAULT_CONFIG['asterisk_right_displacement'], max(image.height, asterisk_img.height)))
             final_image.paste(image, (0, final_image.height - image.height))
             final_image.paste(asterisk_img, (image.width + DEFAULT_CONFIG['asterisk_right_displacement'], 0), mask=asterisk_img)
@@ -33,7 +35,7 @@ class Cost:
 class Asterisk(Cost):
 
     def getCostImage(self) -> Image:
-        return Image.open("assets/general_assets/costs/asterisk.png").convert("RGBA")
+        return Image.open(COST_DIR / "asterisk.png").convert("RGBA")
 
     @classmethod
     def handle_segment(cls, segment: str, current_costs: list) -> bool:
@@ -64,7 +66,7 @@ class Blood(Cost):
         return Blood(self.amount - other.amount)
 
     def getCostImage(self) -> Image:
-        cost_img = Image.open(f"assets/general_assets/costs/blood/blood.png").convert("RGBA")
+        cost_img = Image.open(COST_DIR / "blood" / "blood.png").convert("RGBA")
 
         total_width = cost_img.width * self.amount + DEFAULT_CONFIG['blood_right_displacement'] * (self.amount - 1)
         final_img = Image.new('RGBA', (total_width, cost_img.height))
@@ -100,7 +102,7 @@ class Bones(Cost):
         return Bones(self.amount - other.amount)
 
     def getCostImage(self) -> Image:
-        bone_img = Image.open("assets/general_assets/costs/bones/bone.png").convert("RGBA")
+        bone_img = Image.open(COST_DIR / "bones" / "bone.png").convert("RGBA")
         if self.amount <= 4: # No need for numbers
             final_width = bone_img.width * self.amount + DEFAULT_CONFIG['bone_right_displacement'] * (self.amount - 1)
             final_image = Image.new('RGBA', (final_width, bone_img.height))
@@ -110,9 +112,9 @@ class Bones(Cost):
 
         else: # Need numbers
             digits = list(str(self.amount))
-            number_img = Image.open(f"assets/general_assets/costs/bones/{digits[0]}.png").convert("RGBA")
+            number_img = Image.open(COST_DIR / "bones" / f"{digits[0]}.png").convert("RGBA")
             for digit in digits[1:]:
-                digit_img = Image.open(f"assets/general_assets/costs/bones/{digit}.png").convert("RGBA")
+                digit_img = Image.open(COST_DIR / "bones" / f"{digit}.png").convert("RGBA")
                 if digit_img.height != 11:
                     new_digit_img = Image.new('RGBA', (digit_img.width, 11))
                     new_digit_img.paste(digit_img, (0, 1), digit_img)
@@ -132,7 +134,7 @@ class Bones(Cost):
                 number_img = new_img
             
             final_image = Image.new('RGBA', (number_img.width + 16, number_img.height))
-            x_img = Image.open(f"assets/general_assets/costs/bones/x.png").convert("RGBA")
+            x_img = Image.open(COST_DIR / "bones" / "x.png").convert("RGBA")
             final_image.paste(number_img, (0, 0), number_img)
             final_image.paste(x_img, (number_img.width, number_img.height-8), x_img)
             final_image.paste(bone_img, (number_img.width+7, number_img.height-8), bone_img)
@@ -166,10 +168,10 @@ class Energy(Cost):
         return Energy(self.current_energy - other.current_energy, self.max_energy - other.max_energy)
 
     def getCostImage(self) -> Image:
-        first_cell = Image.open("assets/general_assets/costs/energy/cell_first.png").convert("RGBA")
-        cell = Image.open("assets/general_assets/costs/energy/cell.png").convert("RGBA")
-        energy = Image.open("assets/general_assets/costs/energy/energy.png").convert("RGBA")
-        max_energy = Image.open("assets/general_assets/costs/energy/overcharge.png").convert("RGBA")
+        first_cell = Image.open(COST_DIR / "energy" / "cell_first.png").convert("RGBA")
+        cell = Image.open(COST_DIR / "energy" / "cell.png").convert("RGBA")
+        energy = Image.open(COST_DIR / "energy" / "energy.png").convert("RGBA")
+        max_energy = Image.open(COST_DIR / "energy" / "overcharge.png").convert("RGBA")
 
         # Path 1: Full energy bar (total energy <= 6)
         if (self.current_energy + self.max_energy) <= 6:
@@ -187,7 +189,7 @@ class Energy(Cost):
             return self.addAsterisk(cost_image)
 
         # Path 2: Energy numbers (total energy > 6)
-        x_img = Image.open("assets/general_assets/costs/energy/x.png").convert("RGBA")
+        x_img = Image.open(COST_DIR / "energy" / "x.png").convert("RGBA")
 
         energy_img = self._build_energy_section(self.current_energy, energy, first_cell, cell, x_img)
         overcharge_img = self._build_energy_section(self.max_energy, max_energy, first_cell, cell, self._recolor_overcharge(x_img), is_overcharge=True)
@@ -213,7 +215,7 @@ class Energy(Cost):
             for i, digit in enumerate(digits):
                 cell_x = 4 * (len(digits) - 1 - i)
                 img.paste(first_cell, (cell_x, 0))
-                digit_img = Image.open(f"assets/general_assets/costs/energy/{digit}.png").convert("RGBA")
+                digit_img = Image.open(COST_DIR / "energy" / f"{digit}.png").convert("RGBA")
                 if is_overcharge:
                     digit_img = self._recolor_overcharge(digit_img)
                 img.paste(digit_img, (cell_x + 2, 2), digit_img)
@@ -299,7 +301,7 @@ class Gems(Cost):
         shatter = "_shatter" if "shattered" in gem else ""
         gem = gem.split(" ")[-1].lower()
         color = dict(emeralds="emerald", sapphires="sapphire", rubies="ruby", prisms="prism").get(gem, gem)
-        img = Image.open(f"assets/general_assets/costs/gems/{color.lower()}{shatter}.png").convert("RGBA")
+        img = Image.open(COST_DIR / "gems" / f"{color.lower()}{shatter}.png").convert("RGBA")
         return img
 
     def getCostImage(self) -> Image:

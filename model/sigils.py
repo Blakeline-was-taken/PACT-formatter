@@ -4,6 +4,7 @@ from csv import DictReader
 
 SIGILS = dict()
 TRAITS = dict()
+SIGIL_DIR = GENERAL_ASSETS_DIR / "sigils"
 SIGIL_IMG_SPACE = DEFAULT_CONFIG['sigil_img_space']
 SIGIL_DESC_SPACE = DEFAULT_CONFIG['sigil_space'] - 5 - SIGIL_IMG_SPACE
 SIGIL_NAME_SIZE = DEFAULT_CONFIG['sigil_name_font_size']
@@ -68,13 +69,13 @@ def write_description(x_offset, y_offset, starting_size, description_words, colo
                     colon_id = content.index(":")
                     icon_type = "sigils" if "sigil" in content else "icons"
                     icon_name = content[colon_id + 1:]
-                    icon_path = f"assets/general_assets/{icon_type}/{icon_name}.png"
+                    icon_path = GENERAL_ASSETS_DIR / icon_type / f"{icon_name}.png"
                     if color != "black":
                         icon_path = get_outline_asset(icon_path)
                     try:
                         icon = get_resized_image(Image.open(icon_path), SIGIL_DESC_ICON_SIZE)
                     except FileNotFoundError:
-                        icon = get_resized_image(Image.open("assets/general_assets/sigils/X.png"), SIGIL_DESC_ICON_SIZE)
+                        icon = get_resized_image(Image.open(SIGIL_DIR / "X.png"), SIGIL_DESC_ICON_SIZE)
                     if color != "black":
                         add_color(icon, color)
                     rendered_icons.append((content, icon))
@@ -157,13 +158,13 @@ class Sigil:
 
     def sigilImage(self, color='black'):
         name = self.name.translate(str.maketrans("", "", " ',-!?"))
-        path = f"assets/general_assets/sigils/{name}.png"
+        path = SIGIL_DIR / f"{name}.png"
         if not DEFAULT_CONFIG["allow_colored_sigils"] or color != "black":
             path = get_outline_asset(path)
         try:
             sigil_img = Image.open(path).convert("RGBA")
         except FileNotFoundError as e:
-            sigil_img = Image.open("assets/general_assets/sigils/X.png").convert("RGBA")
+            sigil_img = Image.open(SIGIL_DIR / "X.png").convert("RGBA")
         sigil_img = sigil_img.resize((round(sigil_img.width * SIGIL_SCALE), round(sigil_img.height * SIGIL_SCALE)))
         if color != 'black':
             add_color(sigil_img, color)
@@ -210,11 +211,11 @@ class Sigil:
                     word = word[0:bracket_index]
                 colon_id = word.index(":")
                 icon_type = "sigils" if "sigil" in word else "icons"
-                icon_path = f"assets/general_assets/{icon_type}/{word[colon_id+1:-1]}.png"
+                icon_path = GENERAL_ASSETS_DIR / icon_type / f"{word[colon_id+1:-1]}.png"
                 try:
                     icon = get_resized_image(Image.open(icon_path), TRAIT_DESC_ICON_SIZE)
                 except FileNotFoundError:
-                    icon = get_resized_image(Image.open("assets/general_assets/sigils/X.png"), TRAIT_DESC_ICON_SIZE)
+                    icon = get_resized_image(Image.open(SIGIL_DIR / "X.png"), TRAIT_DESC_ICON_SIZE)
                 add_width(icon.width)
             else:
                 word = " " + word if "HIB" not in word else word[3:]
@@ -250,13 +251,13 @@ class Sigil:
                     word = word[0:word.index("}") + 1]
                 colon_id = word.index(":")
                 icon_type = "sigils" if "sigil" in word else "icons"
-                icon_path = f"assets/general_assets/{icon_type}/{word[colon_id + 1:-1]}.png"
+                icon_path = GENERAL_ASSETS_DIR / icon_type / f"{word[colon_id + 1:-1]}.png"
                 if color != 'black':
                     icon_path = get_outline_asset(icon_path)
                 try:
                     icon = get_resized_image(Image.open(icon_path), TRAIT_DESC_ICON_SIZE)
                 except FileNotFoundError:
-                    icon = get_resized_image(Image.open("assets/general_assets/sigils/X.png"), TRAIT_DESC_ICON_SIZE)
+                    icon = get_resized_image(Image.open(SIGIL_DIR / "X.png"), TRAIT_DESC_ICON_SIZE)
                 if color != 'black':
                     add_color(icon, color)
                 x_offset += draw.textlength(" ", font=heavyweight_font)

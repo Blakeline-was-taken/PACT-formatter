@@ -1,5 +1,6 @@
 import logging, json, os
 from PIL import Image, ImageDraw, ImageFont
+from pathlib import Path
 
 def load_config(temple=None, tier=None, bg_modifier=None):
     config = {}
@@ -27,16 +28,18 @@ def load_config(temple=None, tier=None, bg_modifier=None):
 
     return config
 
+DEFAULT_CONFIG = load_config()
+ROOT = Path(__file__).resolve().parent.parent
+ASSETS_DIR = ROOT / DEFAULT_CONFIG["assets_dir"]
+GENERAL_ASSETS_DIR = ASSETS_DIR / "general_assets"
+FONT = ROOT / "data" / "fonts" / f"{DEFAULT_CONFIG["font"]}.TTF"
+print(f"ROOT DIR: {ROOT}\nASSETS DIR: {ASSETS_DIR}\nGENERAL ASSETS DIR: {GENERAL_ASSETS_DIR}\nFONT PATH: {FONT}")
+
 logging.basicConfig(
     filename='error.log', 
     level=logging.ERROR, 
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-
-DEFAULT_CONFIG = load_config()
-ASSETS_DIR = DEFAULT_CONFIG["assets_dir"]
-FONT = "data/fonts/" + DEFAULT_CONFIG["font"] + ".TTF"
-
 
 def get_color_mapping(temple, tier=None, bg_modifier=None):
     """
@@ -62,16 +65,16 @@ def get_color_mapping(temple, tier=None, bg_modifier=None):
     # Find the first file in the list that actually exists
     color_path = None
     for filename in filenames_to_check:
-        path = f"{ASSETS_DIR}/{temple_name}/{filename}"
+        path = ASSETS_DIR / temple_name / filename
         if os.path.exists(path):
             color_path = path
             break
 
     if not color_path:
-        return {}
+        color_path = GENERAL_ASSETS_DIR / "colors.png"  # Fallback to general colors
 
     config = load_config(temple, tier, bg_modifier)
-    color_keys = list(Image.open(f"{ASSETS_DIR}/general_assets/colors.png").getdata())
+    color_keys = list(Image.open(GENERAL_ASSETS_DIR / "colors.png").getdata())
     colors = list(Image.open(color_path).getdata())
 
     mapping = {}

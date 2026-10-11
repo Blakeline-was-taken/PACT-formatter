@@ -1,6 +1,12 @@
 from os import path
-from model import get_color_mapping, apply_temple_colors, load_config, costs, sigils, Image, ImageDraw, ImageFont, logging, FONT, DEFAULT_CONFIG
-
+from model import (
+    get_color_mapping, apply_temple_colors,
+    load_config,
+    costs, sigils,
+    Image, ImageDraw, ImageFont,
+    logging,
+    ROOT, ASSETS_DIR, GENERAL_ASSETS_DIR, FONT, DEFAULT_CONFIG
+)
 
 def get_card_asset(asset_name, default_folder, temple, tier=None, bg_modifier=None):
     prefixes = []
@@ -12,11 +18,11 @@ def get_card_asset(asset_name, default_folder, temple, tier=None, bg_modifier=No
         prefixes.append(f"{bg_modifier}_")
     prefixes.append("")
 
-    directories = [f"assets/{temple.lower()}", f"assets/general_assets/{default_folder}"]
+    directories = [ASSETS_DIR / temple.lower(), GENERAL_ASSETS_DIR / default_folder]
     for prefix in prefixes:
         for directory in directories:
             try:
-                return apply_temple_colors(Image.open(f"{directory}/{prefix}{asset_name}.png"), temple, tier, bg_modifier)
+                return apply_temple_colors(Image.open(directory / f"{prefix}{asset_name}.png"), temple, tier, bg_modifier)
             except (FileNotFoundError, PermissionError):
                 continue
     
@@ -53,10 +59,10 @@ def get_traitline_image(temple, tier, bg_modifier):
 
 def get_card_art(art_filename, temple, bg_modifier):
     try:
-        art = Image.open(f"assets/general_assets/card_art/{art_filename}")
+        art = Image.open(GENERAL_ASSETS_DIR / "card_art " / art_filename)
         return apply_temple_colors(art, temple, bg_modifier)
     except (FileNotFoundError, PermissionError):
-        return Image.open(f"assets/general_assets/card_art/_placeholder_.png")
+        return Image.open(GENERAL_ASSETS_DIR / "card_art " / "_placeholder_.png")
 
 
 def get_sigil_data(config, csv_dict):
@@ -130,7 +136,7 @@ def print_indicators(config, image, csv_dict, bg_modifier=None, mox_provided=[])
         possible_moxes = ["mox_green", "mox_orange", "mox_blue", "mox_prism"]
         for mox in possible_moxes:
             if mox in csv_dict["Tags"] or mox in mox_provided:
-                mox_img = Image.open(f"assets/general_assets/extras/indicators/{conduit}{mox}.png")
+                mox_img = Image.open(GENERAL_ASSETS_DIR / "extras" / "indicators" / f"{conduit}{mox}.png")
                 image.paste(mox_img, (0, 0), mox_img)
                 
         need_displacement = True
@@ -204,11 +210,11 @@ def print_tribes(config, image, csv_dict, bg_modifier=None):
         pos_y = config['tribes_top_border']
         for tribe in csv_dict["Tribes"].split(" "):
             if tribe:
-                icon_path = f"assets/general_assets/tribes/{tribe.lower()}.png"
+                icon_path = GENERAL_ASSETS_DIR / "tribes" / f"{tribe.lower()}.png"
                 if path.exists(icon_path):
                     tribe_icon = apply_temple_colors(Image.open(icon_path), csv_dict["Temple"], csv_dict["Tier"], bg_modifier)
                 else:
-                    tribe_icon = apply_temple_colors(Image.open("assets/general_assets/tribes/_placeholder_.png"), csv_dict["Temple"], csv_dict["Tier"], bg_modifier)
+                    tribe_icon = apply_temple_colors(Image.open(GENERAL_ASSETS_DIR / "tribes" / "_placeholder_.png"), csv_dict["Temple"], csv_dict["Tier"], bg_modifier)
                 tribe_icon = tribe_icon.resize((tribe_icon.width * 5, tribe_icon.height * 5), Image.NEAREST)
                 image.paste(tribe_icon, (config['tribes_left_border'], pos_y), tribe_icon)
                 pos_y += tribe_icon.height - 5
@@ -764,13 +770,14 @@ def create_card(csv_dict):
 
     # Print the sigil conduit indicator
     if config['show_conduit_sigil_indicators'] and conduit_sigil:
+        conduit_img_path = GENERAL_ASSETS_DIR / "conduit_sigil_indicators" / f"{conduit_sigil}.png"
         try:
-            conduit_img = Image.open(f"assets/general_assets/conduit_sigil_indicators/{conduit_sigil}.png")
+            conduit_img = Image.open(conduit_img_path)
             conduit_x = (image.width - conduit_img.width) // 2
             image = paste_sigil(image, conduit_img, (conduit_x, sigil_y - config['sigil_vertical_spacing']))
             sigil_y += conduit_img.height
         except (FileNotFoundError, PermissionError):
-            logging.warning(f'Warning: Conduit sigil indicator "assets/general_assets/conduit_sigil_indicators/{conduit_sigil}.png" not found.')
+            logging.warning(f'Warning: Conduit sigil indicator "{conduit_img_path}" not found.')
 
     success = False
     # Try default formatting
