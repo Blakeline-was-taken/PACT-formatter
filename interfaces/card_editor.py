@@ -656,6 +656,7 @@ class CardEditor(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
         outer.addLayout(layout)
+
         self.tag_checks = {}
         for index, tag in enumerate(TAG_OPTIONS):
             check = QPushButton(tag)
@@ -663,15 +664,32 @@ class CardEditor(QWidget):
             check.toggled.connect(self._changed)
             layout.addWidget(check, index // 4, index % 4)
             self.tag_checks[tag] = check
+
         background_row = QHBoxLayout()
         background_row.addWidget(QLabel("Background"))
         background_row.addWidget(self.background, 1)
         outer.addLayout(background_row)
+
         self.extra_cell_amount = QSpinBox()
         self.extra_cell_amount.setRange(0, 99)
         self.extra_cell_amount.setPrefix("Extra cells: ")
         self.extra_cell_amount.valueChanged.connect(self._changed)
         outer.addWidget(self.extra_cell_amount)
+
+        symbol_options = self._load_names("sigils.csv", "Name")
+        self.left_symbol = self._suggested_field(symbol_options)
+        self.right_symbol = self._suggested_field(symbol_options)
+        left_symbol_row = QHBoxLayout()
+        left_symbol_row.addWidget(QLabel("Left symbol"))
+        left_symbol_row.addWidget(self.left_symbol, 1)
+        right_symbol_row = QHBoxLayout()
+        right_symbol_row.addWidget(QLabel("Right symbol"))
+        right_symbol_row.addWidget(self.right_symbol, 1)
+        symbol_row = QHBoxLayout()
+        symbol_row.addLayout(left_symbol_row, 1)
+        symbol_row.addLayout(right_symbol_row, 1)
+        outer.addLayout(symbol_row)
+
         return widget
 
     def _build_preview(self):
@@ -815,6 +833,15 @@ class CardEditor(QWidget):
         self.extra_cell_amount.setValue(0)
         for name, check in self.tag_checks.items():
             check.setChecked(name in tags)
+        symbols = {"left": "", "right": ""}
+        for tag in _split(row.get("Tags", "")):
+            for side in symbols:
+                suffix = f"_{side}_symbol"
+                if tag.lower().endswith(suffix) and tag[:-len(suffix)].strip():
+                    symbols[side] = tag[:-len(suffix)].strip()
+                    break
+        self.left_symbol.setCurrentText(symbols["left"])
+        self.right_symbol.setCurrentText(symbols["right"])
         for tag in _split(row.get("Tags", "")):
             if tag.endswith("_extra_cell") and tag.split("_", 1)[0].isdigit():
                 self.extra_cell_amount.setValue(int(tag.split("_", 1)[0]))
@@ -840,6 +867,12 @@ class CardEditor(QWidget):
         background = self.background.currentText().strip().lower()
         tags = [f"{background}_bg"] if background else []
         tags.extend(name for name, check in self.tag_checks.items() if check.isChecked())
+        left_symbol = self.left_symbol.currentText().strip()
+        right_symbol = self.right_symbol.currentText().strip()
+        if left_symbol:
+            tags.append(f"{left_symbol}_left_symbol")
+        if right_symbol:
+            tags.append(f"{right_symbol}_right_symbol")
         if self.extra_cell_amount.value() > 0:
             tags.append(f"{self.extra_cell_amount.value()}_extra_cell")
         row["Tags"] = _join(tags)
