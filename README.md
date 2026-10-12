@@ -13,67 +13,6 @@ If you haven't already, download and install **Python 3** from the official webs
 Open your computer's **Terminal** (Mac/Linux) or **Command Prompt** (Windows), type the following command, and press **Enter**:
 
 ```bash
-pip install Pillow tqdm
-```
-
-* **Pillow** is the engine that handles all the heavy lifting for drawing, layering, and color-swapping image assets. This formatter quite literally cannot work without it.
-* **tqdm** creates the visual progress bars in the console so you can see exactly how fast the cards are rendering. But it's clunky and doesn't even work so it's probably gonna go soon.
-
----
-
-## Upgrading from the Old Formatter
-
-If you have a collection of cards created in the older version of the formatter, follow these steps to migrate your assets and data sheets to the new system.
-
-1. **Move Assets:** Take your old `card_art` and `sigils` folders and place them inside the new `assets/general_assets/` directory.
-2. **Place the Old Data Sheets (say that again?):** Grab your old `cards.csv`, `sigils.csv`, and `traits.csv` files and place them in the `data/` folder (replacing the files inside).
-3. **Run the Converter:** Open the terminal or command prompt in that folder and run the conversion script by typing:
-```bash
-python convert_old_formatter_data.py
-```
-
-4. **Clean Up and Rename:** The script will create three new files in the main directory. Delete your old files (or back them up) and rename the new ones to remove the `updated_` prefix so the application can read them:
-* Rename `updated_cards.csv` to **`cards.csv`**
-* Rename `updated_sigils.csv` to **`sigils.csv`**
-* Rename `updated_traits.csv` to **`traits.csv`**
-
-*(Alternative: You can leave the names as `updated_cards.csv` etc., but you will need to open your `general.json` configuration file and change the file paths to match those exact names. If you really want to do that for some reason).*
-
----
-
-## What Changed?
-
-The migration script does a lot of automatic restructuring to prevent a lot of tedious manual editing. Here is a summary of what changed under the hood and why these new data sheets look a little different:
-
-### Changes to Cards (`cards.csv`)
-
-* **Art File section:** The new system no longer uses the card's name to fetch its art, meaning there can now be multiple cards with the same name. The script creates a new **`Art File`** column, which it fills by following the old formatter's naming convention. (for example, a card named "Wild Wolf!" will have "WildWolf.png" in its Art File column).
-* **Unified Background Tags:** This new formatter now has a Tags system for cards, sigils and traits. This is useful for a variety of things, and you are encouraged to check out the CSV Data Models section to see what tags exist natively and what they can do. But all the conversion script does is adding the **`bloodless_bg`** tag to cards that had a Bloodless sigil or trait, as that is how it used to work. **Do note that you no longer need a card to have a Bloodless sigil/trait in order for it to have the bloodless background, and vice versa**.
-
-### Changes to Sigils & Traits (`sigils.csv` & `traits.csv`)
-
-* **Bracket Change:** The new text layout engine uses curly brackets instead of square ones to display inline graphics, as square brackets could actually be used by the heavyweight font while curly brackets cannot. The script automatically converts old text codes like `[sigil:TouchOfDeath]` into `{sigil:TouchOfDeath}`.
-* **Tags:** Instead of cluttered, individual columns tracking specific behaviors, everything has been streamlined into a single, multi-purpose `Tags` column. The script cleans this up by converting old data toggles:
-  * If the sigil image has a matching `_outline` asset, the formatter automatically uses it when a color override is applied. Therefore the `can_be_colored` column is no longer used.
-  * If the sigil/trait needs to replace the power value entirely, it gets tagged with `power_sigil`. Note that you can now also do this for health using the `health_sigil` tag.
-  * If a sigil has "Conduit" in the name, it gains the **`conduit_sigil`** asset tracker to still use a conduit sigil indicator. Note that those can be turned off by setting the `show_conduit_sigil_indicators` config option to **false**.
-  * The script interprets the sigil's description text to know if it acts as a Mox provider, in which case it applies the correct gem overlay tag (**`mox_green`**, **`mox_orange`**, **`mox_blue`**, or **`mox_prism`**). This is used for cards with the mox indicator.
-
-# Getting Started & Migration Guide
-
-## How to Install
-
-Most of the tools this program needs are already built directly into Python. However, you will need to install two external library packages to handle the images and show progress bars (that one will most likely be removed soon so you might not actually need to do this later).
-
-### 1. Install Python
-
-If you haven't already, download and install **Python 3** from the official website (python.org). Make sure to check the box that says **"Add Python to PATH"** during the installation process.
-
-### 2. Install the Required Packages
-
-Open your computer's **Terminal** (Mac/Linux) or **Command Prompt** (Windows), type the following command, and press **Enter**:
-
-```bash
 pip install -r requirements.txt
 ```
 
@@ -99,7 +38,7 @@ python convert_old_formatter_data.py
 * Rename `updated_sigils.csv` to **`sigils.csv`**
 * Rename `updated_traits.csv` to **`traits.csv`**
 
-*(Alternative: You can leave the names as `updated_cards.csv` etc., but you will need to open your `general.json` configuration file and change the file paths to match those exact names. If you really want to do that for some reason).*
+*(Alternative: You can leave the names as `updated_cards.csv` etc., but you will need to open your `config.json` configuration file and change the file paths to match those exact names. If you really want to do that for some reason).*
 
 ---
 
@@ -116,7 +55,7 @@ The migration script does a lot of automatic restructuring to prevent a lot of t
 
 * **Bracket Change:** The new text layout engine uses curly brackets instead of square ones to display inline graphics, as square brackets could actually be used by the heavyweight font while curly brackets cannot. The script automatically converts old text codes like `[sigil:TouchOfDeath]` into `{sigil:TouchOfDeath}`.
 * **Tags:** Instead of cluttered, individual columns tracking specific behaviors, everything has been streamlined into a single, multi-purpose `Tags` column. The script cleans this up by converting old data toggles:
-  * If a sigil shouldn't be color-swapped, it gets tagged with **`has_color`**.
+  * If the sigil image has a matching `_outline` asset, the formatter automatically uses it when a color override is applied. Therefore the `can_be_colored` column is no longer used.
   * If the sigil/trait needs to replace the power value entirely, it gets tagged with `power_sigil`. Note that you can now also do this for health using the `health_sigil` tag.
   * If a sigil has "Conduit" in the name, it gains the **`conduit_sigil`** asset tracker to still use a conduit sigil indicator. Note that those can be turned off by setting the `show_conduit_sigil_indicators` config option to **false**.
   * The script interprets the sigil's description text to know if it acts as a Mox provider, in which case it applies the correct gem overlay tag (**`mox_green`**, **`mox_orange`**, **`mox_blue`**, or **`mox_prism`**). This is used for cards with the mox indicator.
@@ -183,7 +122,7 @@ When using the CLI, select the asset type when prompted:
 
 ## 3. Finding Exports
 
-Once the progress bar completes, all rendered images are compiled inside an `exports/` directory. Depending on the configurations in `config/general.json`, they will look like this:
+Once the progress bar completes, all rendered images are compiled inside an `exports/` directory. Depending on the configurations in `config.json`, they will look like this:
 
 ### Cards (`exports/cards/`)
 
@@ -238,12 +177,13 @@ This sheet acts as the blueprint for every individual card generated by the form
 * **`Traits`**: A comma-separated list of traits pulled from `traits.csv`. Renders a separator graphic (`traitline.png`).
 * **`Token`**: A comma-separated list of string values used to inject dynamic data variables into sigil/trait descriptions. Every time the formatter encounters the exact uppercase keyword `TOKEN` inside a description string, it pops the next value from this list and drops it into the layout.
 * **`Tags`**: Internal control flags that direct specific changes:
-  * *`[name]_bg`*: Injects an asset override mask. For example, `bloodless_bg` signals the system to look for background sheets matching `bloodless_bg.png` and checks for matching overrides in the config file.
+  * *`[name]_bg`*: Injects a background modifier. For example, `bloodless_bg` signals the system to look for background sheets matching `bloodless_bg.png` and apply matching settings from the configuration hierarchy.
   * *`gemified_vanila`*: Pastes a more vanilla-faithful gemification render onto standard cardbacks before any artwork is drawn.
   * *`conduit_indicator` / `mox_indicator`*: Toggles overlay maps on the upper frame of the card. Renders conduit traces or aligned gems (`mox_green`, `mox_orange`, `mox_blue`, `mox_prism`).
-  * *`[integer]_extra_cell`*: (e.g., `3_extra_cells`) Stacks as many energy cells vertically down the left border of the card frame as indicated in the tag.
   * *`conduit_sigil_indicator`*: Places a standard `NullConduit` sigil indicator if no specific conduit sigil is assigned.
-* **`Flavor Text`**: Narrative text strings. The layout engine strips line breaks, handles soft truncation via automated ellipsis placement if the text extends past `flavor_text_max_width`, and adds vertical displacement padding if indicator flags are set.
+  * *`[integer]_extra_cell`*: (e.g., `3_extra_cells`) Stacks as many energy cells vertically down the left border of the card frame as indicated in the tag.
+  * *`[sigil]_left_symbol` / `[sigil]_right_symbol`*: Places a sigil icon on the bottom-left or bottom-right corner of the card. The sigil must be named exactly the same as the one in `sigils.csv` for this to work, spaces and capitalization included.
+* **`Flavor Text`**: Narrative text strings. Supports explicit line breaks with `\n`. See [Rich Text Formatting](#rich-text-formatting) for inline formatting.
 * **`Tribes`**: Space-separated list of structural tribes. Used to display tribe icons on the top-right border of the card art. Also written in the metadata at the top of the card, alongside the `Tier` and `Temple`.
 * **`Credit`**: Author or artist attribution text strings, written at the bottom of the card.
 * **`Art File`**: The target graphic filename inside the `assets/general_assets/card_art` directory. If the file is missing or blocked, the system uses a `_placeholder_.png` asset as a fallback.
@@ -253,19 +193,91 @@ This sheet acts as the blueprint for every individual card generated by the form
 These two sheets define the sub-components of the cards. Both utilize identical structures:
 
 * **`Name`**: Serves as both the name of the sigil and the name of the asset to look for in `assets/general_assets/sigils/`.
-* **`Description`**: The informational paragraph. This formatter includes a robust structural text compiler that decodes formatting tokens:
-  * *`\n`*: Forces a clean row jump.
-  * *`{sigil:SigilName}`*: Compiles and patches a miniature sigil icon directly inside the flowing text field.
-  * *`{icon:IconName}`*: Inserts decorative indicators or icon graphics directly inside the flowing text field.
+* **`Description`**: The informational paragraph. Supports inline formatting; see [Rich Text Formatting](#rich-text-formatting).
 * **`Tags`**: Diagnostic metadata values.
     * *`power_sigil` / `health_sigil`*: Replaces the number on the power or health or both and substitutes the entire value zone with its sigil icon using `power_sigil_center` and `health_sigil_center` to dictate where it goes.
-    * *`mox_[color]`* (e.g., `mox_green`, `mox_orange`, `mox_blue`, `mox_prism`) : adds a gem to the mox indicator if the card the sigil is printed onto has one.
+    * *`conduit_sigil`*: Adds a sigil conduit indicator if one with the same name as this sigil's icon is present in the `assets/general_assets/conduit_sigil_indicators/` folder.
+    * *`mox_[color]`* (e.g., `mox_green`, `mox_orange`, `mox_blue`, `mox_prism`): Adds a gem to the mox indicator if the card the sigil is printed onto has one.
+
+## Rich Text Formatting
+
+Inline formatting is available in rendered text fields: card names, flavor text, metadata, art credits, stats and gemification values, sigil and trait names and descriptions, and conditional labels.
+
+* `{sigil:SigilName}` inserts a sigil image from `assets/general_assets/sigils/`.
+* `{icon:IconName}` inserts an icon image from `assets/general_assets/icons/`.
+* `{color:ColorName}text{/color}` applies a configured color to the enclosed text. Color names are case-insensitive, and color spans can be nested.
+* `\n` starts a new line.
+
+Define named colors in `text_colors` in `config.json`. A color can be an RGB list, a 1-based index into the active temple/tier/background `colors.png` palette, or a list of RGB colors. A color list cycles through its colors for each non-whitespace character in the span:
+
+```json
+"text_colors": {
+  "dark": { "index": 7 },
+  "red": [255, 0, 0],
+  "gems": [[77, 125, 21], [143, 69, 23], [16, 102, 104]],
+  "rainbow": [[182, 20, 20], [218, 102, 39], [204, 157, 25]]
+}
+```
+
+For example, `{color:red}Danger{/color}` displays “Danger” in the configured red color, while `{color:gems}Gemified{/color}` cycles through the RGB colors in `gems`. Whitespace does not advance the color cycle. The `Rich Text` sample card in `cards.csv` demonstrates inline icons, cycling colors, and nested color spans. Inline icons are sized to the actual rendered height of the text glyphs, rather than the font's nominal size.
+
+When selecting cards to export, enter the visible card name without any rich-text tags (for example, `Rich Text`, not `Rich {color:rainbow}Text{/color}`).
 
 ---
 
-## The Configuration Blueprint (`general.json`)
+## The Configuration Blueprint (`config.json`)
 
-The configuration files set the global variables, spatial coordinates, fallback mechanics, export values, rules, and basically everything that is hard-coded. Each temple config file just serves to override some of the values listed in the `general.json` in that specific temple (and often of a specific tier in that temple).
+The `config.json` file contains all global and temple-specific settings. Configuration is nested by temple, tier, and background modifier. Every setting in a more specific section replaces the same setting from less specific sections.
+
+### Temple, Tier & Modifier Hierarchy
+
+The top-level keys select a temple, the second-level keys select a tier, and the third-level keys select a background modifier. If any of these keys are omitted, the configuration will fall back to the `default` values. Put ordinary global settings in `default.default.default`. For example:
+
+```json
+{
+    "default": {
+        "default": {
+            "default": {
+                "sigil_bottom_border": 1430
+            },
+            "bloodless": {
+                "power_sigil_center": [215, 930]
+            }
+        },
+        "rare": {
+            "default": {
+                "sigil_bottom_border": 1420
+            },
+            "bloodless": {
+                "sigil_bottom_border": 1410
+            }
+        }
+    },
+    "beast": {
+        "default": {
+            "default": {
+                "power_sigil_center": [220, 925]
+            }
+        },
+        "rare": {
+            "default": {
+                "sigil_bottom_border": 1400
+            }
+        }
+    }
+}
+```
+
+As an easy way to visualize this, imagine that there is 3 slots. One for temple, one for tier and one for modifier. Each of these starts off as being `"default"`, and so the first config layer loaded is the `default.default.default` layer.
+
+The formatter then progressively fills in these slots from left to right, each time stacking the next layer on top of the previous one, if said layer exists. For example, if a card is a Rare Beast card with the `bloodless_bg` tag, configuration is layered in this order:
+
+1. `default.default.default` (global baseline)
+2. `beast.default.default` (temple settings)
+3. `default.rare.default`, then `beast.rare.default` (tier settings)
+4. `default.default.bloodless`, `beast.default.bloodless`, `default.rare.bloodless`, then `beast.rare.bloodless` (modifier settings)
+
+If any of these layers are empty, they are just skipped. The only required layer is `default.default.default`, which is the baseline for all other settings.
 
 ### Architectural Core & Global Toggles
 
@@ -299,6 +311,7 @@ The formatter contains three separate rendering formats to ensure content fits c
 * **`default_tier`**: The baseline tier fallback used whenever a card's tier value is missing or invalid.
 * **`[element]_font_size` / `[element]_max_width`**: Global controls handling font dimensions and text wrapping boundaries for names, flavor text, metadata, stats, and sigils.
 * **`[element]_color_index`**: Maps structural text elements directly to index slots in the color arrays (`colors.png`). The values match the formatter's internal offset calculations (`index - 1`).
+* Inline icon height is measured from the text glyphs in each rendered text field. See [Rich Text Formatting](#rich-text-formatting) for the markup reference.
 
 ### Spacing & Grid Boundaries
 
@@ -311,13 +324,16 @@ The formatter contains three separate rendering formats to ensure content fits c
 
 * **`cost_right_border` / `cost_left_border` / `cost_bottom_border`**: A bounding box that dictates exactly where the card cost renders.
 * **`cost_right_border_gemification_displacement`**: Adjusts the right-hand layout margin when costs feature gemification.
-* **`name_top_border` / `name_left_border` / `flavor_text_top_border` / `flavor_text_left_border` / `metadata_top_border` / `art_credit_top_border`**: Fixed positions for text labels.
+* **`*_right_displacement`**: Adjusts how much the next cost image in a given cost should shift to the right when placed.
+* **`name_top_border` / `name_left_border` / `flavor_text_top_border` / `flavor_text_left_border` / `flavor_text_right_border` / `metadata_top_border` / `art_credit_top_border`**: Fixed positions for text labels.
 * **`indicator_displacement`**: An offset value that shifts flavor text and sigils downwards if an indicator (like conduit or mox) is present.
-* **`sigil_top_border` / `sigil_left_border` / `sigil_bottom_border`**: Establishes the layout space for rendering sigils and traits.
+* **`sigil_top_displacement` / `sigil_left_border` / `sigil_bottom_border`**: Establishes the layout space for rendering sigils and traits. The displacement is added to the flavor text vertical position.
 * **`power_sigil_center` / `health_sigil_center`**: Precise midpoint for centering replacement sigil icons.
 * **`power_coord` / `health_coord`**: Fixed points for drawing the stats.
 * **`extra_cells_top_border` / `extra_cells_left_border`**: Fixed top-left point position for drawing extra cells.
 * **`tribes_top_border` / `tribes_left_border`**: Fixed top-left point position for drawing tribe icons.
+* **`left_symbol` / `right-symbol`**: Fixed bottom-left and bottom-right positions for drawing sigil symbols.
+* **`colorless_symbols`**: Toggles whether sigil symbols should use their colorless `_outline` variants or not. 
 
 ### Gemification, Patch & Conditional Bounds
 
@@ -325,42 +341,6 @@ The formatter contains three separate rendering formats to ensure content fits c
 * **`gemification_sigil_*` / `cell_sigil_*` / `latch_sigil_*`**: Sets custom vertical adjustments and dictates when the formatter swaps out small, medium, or large background patches based on the size of the sigil.
 * **`left_latch_head_border` / `right_latch_head_border`**: Sets precise positionings for the heads of the latchers.
 * **`arcane_sigil_*` / `tribal_sigil_*`**: Sets the vertical adjustement and custom text for arcane and tribal sigils.
-
-### The Overrides Cascading Inheritance Tree
-
-The `overrides` block specifies custom properties that automatically trigger based on a card's theme or rarity.
-
-```json
-"overrides": {
-    "default": {
-        "uncommon": {
-            "sigil_bottom_border": 1440
-        }
-    },
-    "bloodless": {
-        "default": {
-            "sigil_bottom_border": 1440,
-            "power_sigil_center": [215, 930],
-            "power_coord": [193, 885]
-        },
-        "uncommon": {
-            "sigil_bottom_border": 1450
-        }
-    }
-}
-```
-
-When generating a card, the system resolves its configuration by applying settings in a strict order of priority:
-
-1. It starts by loading all baseline settings from the global configuration file.
-2. If a specific background modifier tag is detected (e.g., `bloodless_bg`), the formatter jumps into that theme's override block and applies its baseline values (found under `"default"`).
-3. Finally, it checks the card's `Tier` value. If a matching rarity block exists within that theme's section, those settings are applied last, overriding any previous values.
-
-This structure allows the fine-tuning layouts. For example, if a specific background theme uses a thicker bottom border (like the Rare Beast one), we can adjust the layout boundaries for that entire subset of cards without breaking the global layout rules.
-
-Here is the clear, user-friendly breakdown of how the asset and color systems function under the hood, written for non-programmers who want to customize their card templates.
-
----
 
 ## Assets & Colors
 
@@ -386,7 +366,7 @@ For example, if we are generating a **Rare** card with a **bloodless_bg** tag in
 7. `assets/general_assets/cardbacks/bloodless_bg.png` *(Modifier)*
 8. `assets/general_assets/cardbacks/bg.png` *(usually doesn't exist)*
 
-If it goes through this entire list and finds nothing, it changes the Tier to the default tier (set in `general.json`) and runs the search one more time before giving up.
+If it goes through this entire list and finds nothing, it changes the Tier to the default tier (set in `config.json`) and runs the search one more time before giving up.
 
 ### Dynamic Palette System (`colors.png`)
 
@@ -415,6 +395,7 @@ A **Temple** represents the core visual theme of a card (like Beast, Undead, Tec
 2. **Establish the color scheme:** Copy a `colors.png` file from an existing temple folder and paste it into the new folder. Open it in any image editor to change the pixel blocks to match the new theme's text and outline colors.
 3. **Add unique assets:** Whenever this new theme requires a unique card template, drop it directly into this new folder. This will usually include stuff like backgrounds (e.g. `common_bg.png`), colors (e.g. `rare_colors.png`) and extra bits and pieces (e.g. `TRIBAL.png`). The formatter will automatically use these instead of the global versions.
 4. **Apply it to cards:** Open `cards.csv` and type the exact name of this new folder (e.g., `Alchemy`) into the `Temple` column for any card that wants to use this temple.
+5. **Add temple-specific settings (Optional):** Add a lowercase temple key (e.g., `"alchemy"`) in `config.json`, then add settings under its tier and modifier keys. Only include values that should differ from the shared defaults.
 
 ---
 
@@ -424,13 +405,15 @@ Adding a new **Tier** is slightly more complicated, as tiers can be used by mult
 
 1. **Define the tier name:** Choose a name for this new rarity tier (e.g., `Mythical`).
 2. **Create tier-prefixed graphics:** Since tiers are meant to change the look of the card, it will need new images prefixed with its name. For example, dropping `mythical_bg.png` into `general_assets/` will create a generalized background for that tier. Usually this will also require creating temple-based variants of that asset to put into every temple asset folder, mostly because of the power graphic on backgrounds.
-3. **Add spacing overrides (Optional):** If this custom tier requires shifting text around, open `general.json`, scroll down to the `"overrides"` section and add the new tier to customize its layout boundaries:
+3. **Add tier settings (Optional):** If this custom tier requires shifting text around, add the tier under `default` in `config.json`:
 ```json
-"overrides": {
+{
     "default": {
         "mythical": {
-            "sigil_bottom_border": 1350,
-            "flavor_text_top_border": 1100
+            "default": {
+                "sigil_bottom_border": 1350,
+                "flavor_text_top_border": 1100
+            }
         }
     }
 }

@@ -5,7 +5,8 @@ import traceback
 from csv import DictReader
 from tqdm import tqdm
 from PIL import Image
-from model import cards, sigils, costs, DEFAULT_CONFIG, ASSETS_DIR, logging
+from model import cards, sigils, costs, DEFAULT_CONFIG, ASSETS_DIR, FONT, ImageFont, logging
+from model.text import get_inline_icon_size, strip_rich_text_tags
 
 CARDS_FILE_PATH = DEFAULT_CONFIG["cards_file_path"]
 SIGILS_FILE_PATH = DEFAULT_CONFIG["sigils_file_path"]
@@ -53,7 +54,7 @@ def export_data(csv_file, arrays, export_function):
               colour="blue") as pbar:
         for row in csv_file:
             try:
-                item_name = row.get('Card Name', row.get('Name', '')).upper()
+                item_name = strip_rich_text_tags(row.get('Card Name', row.get('Name', ''))).strip().upper()
                 if item_name in arrays.values():
                     found = False
                     for open_array in open_arrays:
@@ -159,11 +160,11 @@ try:
 
         def export_card(row):
             image = cards.create_card(row)
+            card_name = strip_rich_text_tags(row.get('Card Name', row.get('Name', ''))).strip()
+            file_name = row['Art File'] if row['Art File'] else (card_name + ".png")
             if DEFAULT_CONFIG["export_sorted_by_folder"]:
-                file_name = row['Art File'] if row['Art File'] else row['Card Name']
                 save_image(image, f"exports/cards/{row['Temple']}/{row['Tier']}/{file_name}")
             else:
-                file_name = row['Art File'] if row['Art File'] else row['Card Name']
                 save_image(image, f"exports/cards/{file_name}")
 
 
@@ -176,6 +177,7 @@ try:
         data_arrays = extract_arrays()
 
         color = "black" if DEFAULT_CONFIG["export_color"] == (0, 0, 0) else DEFAULT_CONFIG["export_color"]
+        color_map = sigils.get_color_mapping("default")
         if DEFAULT_CONFIG["export_sigil_patches"]:
             patch = Image.open(f"{ASSETS_DIR}/general_assets/patch.png")
 
@@ -184,16 +186,20 @@ try:
             sigil = sigils.SIGILS[row['Name']]
 
             if DEFAULT_CONFIG["export_normal_formatting"]:
-                img = sigil.getImage(color=color)
+                img = sigil.getImage(color=color, config=DEFAULT_CONFIG, color_map=color_map)
                 save_image(img, "exports/sigils/" + sigil.name + ".png")
 
             if DEFAULT_CONFIG["export_shorter_formatting"]:
-                save_image(sigil.getImage(shortened_format=True, color=color),
-                           "exports/short sigils/" + sigil.name + ".png")
+                save_image(
+                    sigil.getImage(shortened_format=True, color=color, config=DEFAULT_CONFIG, color_map=color_map),
+                    "exports/short sigils/" + sigil.name + ".png"
+                )
 
             if DEFAULT_CONFIG["export_base_game_formatting"]:
-                save_image(sigil.getImage(base_game=True, color=color),
-                           "exports/base game sigils/" + sigil.name + ".png")
+                save_image(
+                    sigil.getImage(base_game=True, color=color, config=DEFAULT_CONFIG, color_map=color_map),
+                    "exports/base game sigils/" + sigil.name + ".png"
+                )
 
             if DEFAULT_CONFIG["export_sigil_patches"]:
                 sigil_img = sigil.sigilImage(color=color)
@@ -203,11 +209,23 @@ try:
                 save_image(sigil_patch, "exports/sigil patches/" + sigil.name + "_patch.png")
 
             if DEFAULT_CONFIG["export_sigil_description_icon"]:
-                icon = sigils.get_resized_image(sigil.sigilImage(color=color), DEFAULT_CONFIG['sigil_description_icon_size'])
+                icon = sigils.get_resized_image(
+                    sigil.sigilImage(color=color),
+                    get_inline_icon_size(
+                        sigil.get_description(),
+                        ImageFont.truetype(FONT, DEFAULT_CONFIG["sigil_description_font_size"])
+                    )
+                )
                 save_image(icon, "exports/sigil icons/" + sigil.name + "_icon.png")
 
             if DEFAULT_CONFIG["export_trait_description_icon"]:
-                icon = sigils.get_resized_image(sigil.sigilImage(color=color), DEFAULT_CONFIG['trait_description_icon_size'])
+                icon = sigils.get_resized_image(
+                    sigil.sigilImage(color=color),
+                    get_inline_icon_size(
+                        sigil.get_description(),
+                        ImageFont.truetype(FONT, DEFAULT_CONFIG["trait_description_font_size"])
+                    )
+                )
                 save_image(icon, "exports/sigil icons/" + sigil.name + "_trait-icon.png")
 
 
@@ -229,10 +247,11 @@ try:
             color = cards.TEXT_COLORS[temple]
         else:
             color = "black" if DEFAULT_CONFIG["export_color"] == (0, 0, 0) else DEFAULT_CONFIG["export_color"]
+        color_map = sigils.get_color_mapping("default")
 
 
         def export_trait(row):
-            trait_img = sigils.TRAITS[row["Name"]].getImage(color=color)
+            trait_img = sigils.TRAITS[row["Name"]].getImage(color=color, config=DEFAULT_CONFIG, color_map=color_map)
             if traitline:
                 box = (max(trait_img.width, traitline.width), traitline.height + 6 + trait_img.height)
                 final_img = Image.new("RGBA", box, (0, 0, 0, 0))

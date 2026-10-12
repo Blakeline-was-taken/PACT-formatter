@@ -1,31 +1,48 @@
 import logging, json, os
 from PIL import Image, ImageDraw, ImageFont
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
 
 def load_config(temple=None, tier=None, bg_modifier=None):
+    config_tree = json.load(open(ROOT / "config.json", "r", encoding="utf-8"))
+
+    default_temple = config_tree["default"]
+    temple = temple.lower() if temple else "default"
+    temple_config = config_tree.get(temple, default_temple)
+    tier = tier.lower() if tier else "default"
+    bg_modifier = bg_modifier.lower() if bg_modifier else "default"
     config = {}
-    files_to_load = ["general"]
-    if temple:
-        files_to_load.append(temple.lower())
-    for filename in files_to_load:
-        path = f"config/{filename}.json"
-        if os.path.exists(path):
-            with open(path, "r") as f:
-                config.update(json.load(f))
 
-    # If no background modifier is passed, we assume it's the "default" background
-    active_bg = bg_modifier if bg_modifier else "default"
-    tier_lower = tier.lower() if tier else None
+    def apply_section(section):
+        if isinstance(section, dict):
+            config.update(section)
 
-    if "overrides" in config and active_bg in config["overrides"]:
-        bg_config = config["overrides"][active_bg]
-        # 1. Apply the base shifts for this specific background type
-        if "default" in bg_config and isinstance(bg_config["default"], dict):
-            config.update(bg_config["default"])
-        # 2. Apply the rarity-specific shifts for this background type
-        if tier_lower and tier_lower in bg_config:
-            config.update(bg_config[tier_lower])
+    apply_section(default_temple["default"]["default"])
+    
+    if temple != "default":
+        apply_section(temple_config.get("default", {}).get("default"))
+
+    if tier:
+        apply_section(default_temple.get(tier, {}).get("default"))
+        if temple != "default":
+            apply_section(temple_config.get(tier, {}).get("default"))
+
+    if bg_modifier != "default":
+        apply_section(default_temple["default"].get(bg_modifier))
+        if temple != "default":
+            apply_section(temple_config.get("default", {}).get(bg_modifier))
+        if tier:
+            apply_section(default_temple.get(tier, {}).get(bg_modifier))
+            if temple != "default":
+                apply_section(temple_config.get(tier, {}).get(bg_modifier))
 
     return config
+
+DEFAULT_CONFIG = load_config()
+ASSETS_DIR = ROOT / DEFAULT_CONFIG["assets_dir"]
+GENERAL_ASSETS_DIR = ASSETS_DIR / "general_assets"
+FONT = ROOT / "data" / "fonts" / f"{DEFAULT_CONFIG['font']}.TTF"
 
 logging.basicConfig(
     filename='error.log', 
@@ -33,17 +50,12 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
-DEFAULT_CONFIG = load_config()
-ASSETS_DIR = DEFAULT_CONFIG["assets_dir"]
-FONT = "data/fonts/" + DEFAULT_CONFIG["font"] + ".TTF"
-
-
 def get_color_mapping(temple, tier=None, bg_modifier=None):
     """
     Loads and returns the color mapping dictionary for a specific temple and tier.
     Maps general color keys (from general_assets/colors.png) to temple/tier-specific colors.
     """
-    temple_name = temple.lower()
+    temple = temple.lower()
     tier_name = tier.lower() if tier else None
     
     # Clean up the bg_modifier
@@ -62,16 +74,16 @@ def get_color_mapping(temple, tier=None, bg_modifier=None):
     # Find the first file in the list that actually exists
     color_path = None
     for filename in filenames_to_check:
-        path = f"{ASSETS_DIR}/{temple_name}/{filename}"
+        path = ASSETS_DIR / temple / filename
         if os.path.exists(path):
             color_path = path
             break
 
     if not color_path:
-        color_path = f"{ASSETS_DIR}/general_assets/colors.png"  # Fallback to general colors
+        color_path = GENERAL_ASSETS_DIR / "colors.png"  # Fallback to general colors
 
     config = load_config(temple, tier, bg_modifier)
-    color_keys = list(Image.open(f"{ASSETS_DIR}/general_assets/colors.png").getdata())
+    color_keys = list(Image.open(GENERAL_ASSETS_DIR / "colors.png").getdata())
     colors = list(Image.open(color_path).getdata())
 
     mapping = {}
@@ -94,6 +106,7 @@ def get_color_mapping(temple, tier=None, bg_modifier=None):
                     mapping[ind] = colors[i]
             # Map the raw color-to-color replacement if applicable
             mapping[color_keys[i]] = colors[i]
+    mapping["palette_colors"] = colors
     return mapping
 
 
