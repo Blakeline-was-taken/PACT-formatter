@@ -9,6 +9,39 @@ from model import (
 )
 from model.text import draw_rich_text, measure_rich_text
 
+
+STAT_GEM_NAMES = {"green", "blue", "orange", "prism"}
+
+
+def parse_stat_gemification(value):
+    """Split a gemified stat into its gems, gemification text, and displayed value."""
+    parts = []
+    start = 0
+    in_markup = False
+    for index, character in enumerate(value):
+        if character == "{":
+            in_markup = True
+        elif character == "}":
+            in_markup = False
+        elif character == "_" and not in_markup:
+            parts.append(value[start:index])
+            start = index + 1
+    parts.append(value[start:])
+
+    gems = []
+    for part in parts:
+        if part.lower() not in STAT_GEM_NAMES:
+            break
+        gems.append(part.lower())
+    if not gems or len(parts) <= len(gems):
+        return None
+
+    remaining = parts[len(gems):]
+    stat_value = remaining[-1]
+    effect = "_".join(remaining[:-1])
+    return gems, effect, stat_value
+
+
 def get_card_asset(asset_name, default_folder, temple, tier=None, bg_modifier=None):
     prefixes = []
     if tier and bg_modifier:
@@ -147,13 +180,14 @@ def print_indicators(config, image, csv_dict, bg_modifier=None, mox_provided=[])
 
 def print_stat_gemification_indicators(config, image, csv_dict, bg_modifier=None):
     for stat in ["Health", "Power", "Cost"]:
-        if "_" not in csv_dict[stat]:
+        gemification = parse_stat_gemification(csv_dict[stat])
+        if not gemification:
             continue
 
         gemified_asset = get_card_asset(stat.lower(), "extras/gemification", csv_dict["Temple"], csv_dict["Tier"], bg_modifier)
         image.paste(gemified_asset, (0, 0), gemified_asset)
         
-        gems_list = csv_dict[stat].lower().split("_")[:-2]
+        gems_list, _, _ = gemification
         if "prism" in gems_list:
             gem_file = "prism"
         else:
@@ -459,8 +493,9 @@ def write_stats(config, color_map, image, csv_dict, power_sigil, health_sigil, b
         image = paste_sigil(image, power_sigil, (power_center[0] - power_sigil.width // 2, power_center[1] - power_sigil.height // 2))
     else:
         power = csv_dict["Power"]
-        if "_" in power:
-            power = power.lower().split("_").pop()
+        gemification = parse_stat_gemification(power)
+        if gemification:
+            power = gemification[2]
         draw_rich_text(image, power, stats_font, config['power_coord'], "black", color_map, config)
 
     if health_sigil and config['show_health_sigil']:
@@ -468,8 +503,9 @@ def write_stats(config, color_map, image, csv_dict, power_sigil, health_sigil, b
         image = paste_sigil(image, health_sigil, (health_center[0] - health_sigil.width // 2, health_center[1] - health_sigil.height // 2))
     else:
         health = csv_dict["Health"]
-        if "_" in health:
-            health = health.lower().split("_").pop()
+        gemification = parse_stat_gemification(health)
+        if gemification:
+            health = gemification[2]
         draw_rich_text(image, health, stats_font, config['health_coord'], "black", color_map, config)
 
     return image
@@ -478,8 +514,9 @@ def write_stats(config, color_map, image, csv_dict, power_sigil, health_sigil, b
 def write_stat_gemification_text(config, color_map, image, draw, csv_dict):
     gemification_font = ImageFont.truetype(FONT, config['gemification_font_size'])
     for stat in ["Health", "Power", "Cost"]:
-        if "_" in csv_dict[stat]:
-            text = csv_dict[stat].split("_")[-2]
+        gemification = parse_stat_gemification(csv_dict[stat])
+        if gemification and gemification[1]:
+            text = gemification[1]
             text_x = config[f'gemification_{stat.lower()}_text_horizontal_center'] - (measure_rich_text(text, gemification_font, "black", color_map, config) // 2)
             draw_rich_text(image, text, gemification_font, (text_x, config[f'gemification_{stat.lower()}_text_top_border']), "black", color_map, config)
 

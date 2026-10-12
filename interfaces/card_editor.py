@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
 )
 
 from model import DEFAULT_CONFIG, cards, sigils
+from model.text import strip_rich_text_tags
 from .gui_helpers import Gemification, NoWheelComboBox, ROOT, _split, _join
 
 
@@ -628,10 +629,10 @@ class CardEditor(QWidget):
         row = QWidget()
         layout = QHBoxLayout(row)
         layout.setContentsMargins(0, 0, 0, 0)
-        number = QSpinBox()
-        number.setRange(-99, 99)
-        number.valueChanged.connect(self._changed)
-        layout.addWidget(number, 1)
+        value = QLineEdit()
+        value.setPlaceholderText("Number...")
+        value.textChanged.connect(self._changed)
+        layout.addWidget(value, 1)
         toggle = QPushButton("Gemified")
         toggle.setCheckable(True)
         gem = Gemification(True)
@@ -642,7 +643,7 @@ class CardEditor(QWidget):
         layout.addWidget(toggle)
         layout.addWidget(gem, 2)
         form.addRow(name, row)
-        self.fields[name] = number
+        self.fields[name] = value
         self.fields[name + " toggle"] = toggle
         self.fields[name + " gem"] = gem
         return row
@@ -766,14 +767,21 @@ class CardEditor(QWidget):
         """Repopulate the card selector while retaining the displayed text."""
         self.search.blockSignals(True)
         self.search.clear()
-        self.search.addItems([row.get("Card Name", "") for row in self.rows])
-        self.search.setCurrentText(text)
+        self.search.addItems([
+            strip_rich_text_tags(row.get("Card Name", "")).strip()
+            for row in self.rows
+        ])
+        self.search.setCurrentText(strip_rich_text_tags(text).strip())
         self.search.blockSignals(False)
 
     def _filter_cards(self, text):
         """Filter card names as the user types without loading a card."""
-        query = text.lower()
-        matches = [row["Card Name"] for row in self.rows if query in row.get("Card Name", "").lower()]
+        query = strip_rich_text_tags(text).strip().casefold()
+        matches = [
+            strip_rich_text_tags(row.get("Card Name", "")).strip()
+            for row in self.rows
+            if query in strip_rich_text_tags(row.get("Card Name", "")).strip().casefold()
+        ]
         self.search.blockSignals(True)
         self.search.clear()
         self.search.addItems(matches)
@@ -783,7 +791,11 @@ class CardEditor(QWidget):
     def _search_activated(self):
         """Load the exact selected card after the user presses Load."""
         name = self.search.currentText().strip()
-        matches = [i for i, row in enumerate(self.rows) if row.get("Card Name") == name]
+        query = strip_rich_text_tags(name).strip().casefold()
+        matches = [
+            i for i, row in enumerate(self.rows)
+            if strip_rich_text_tags(row.get("Card Name", "")).strip().casefold() == query
+        ]
         if matches and self._confirm_navigation():
             self._select_index(matches[0])
 
@@ -816,13 +828,16 @@ class CardEditor(QWidget):
         self.art.setText(row.get("Art File", ""))
         for name in ("Power", "Health"):
             raw = row.get(name, "")
-            try:
-                self.fields[name].setValue(int(raw.split("_")[-1] if "_" in raw else raw or 0))
-            except ValueError:
-                self.fields[name].setValue(0)
-            self.fields[name + " toggle"].setChecked("_" in raw)
-            if "_" in raw:
-                self.fields[name + " gem"].set_value(raw)
+            gemification = cards.parse_stat_gemification(raw)
+            if gemification:
+                gems, effect, stat_value = gemification
+                self.fields[name].setText(stat_value)
+                self.fields[name + " toggle"].setChecked(True)
+                self.fields[name + " gem"].set_gems(gems)
+                self.fields[name + " gem"].effect.setText(effect)
+            else:
+                self.fields[name].setText(raw or "0")
+                self.fields[name + " toggle"].setChecked(False)
         self.costs.set_values(row.get("Cost", "").split(" + ") if row.get("Cost") else [])
         self.sigils.set_values(_split(row.get("Sigils", "")))
         self.traits.set_values(_split(row.get("Traits", "")))
@@ -856,7 +871,7 @@ class CardEditor(QWidget):
         row["Tier"] = self.fields["Tier"].currentText().strip()
         row["Art File"] = self.art.text().strip()
         for name in ("Power", "Health"):
-            value = str(self.fields[name].value())
+            value = self.fields[name].text().strip()
             row[name] = self.fields[name + " gem"].value(value) if self.fields[name + " toggle"].isChecked() else value
         row["Cost"] = self.costs.serialized()
         row["Sigils"] = _join(self.sigils.values())
