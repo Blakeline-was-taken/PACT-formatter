@@ -264,9 +264,7 @@ class SigilRow(DraggableRow):
         self.gemification = Gemification(False)
         self.gemification.setVisible(conditional == "Gemified")
         self.gemification.set_gems(gems.split("_") if gems else [])
-        self.conditional.currentTextChanged.connect(
-            lambda value: self.gemification.setVisible(value == "Gemified")
-        )
+        self.conditional.currentTextChanged.connect(lambda value: self.gemification.setVisible(value == "Gemified"))
         self.gemification.changed.connect(self.changed)
         layout.addWidget(self.label, 1)
         layout.addWidget(self.conditional)
@@ -292,8 +290,8 @@ class ElementList(QWidget):
     def __init__(self, title, options, conditional=False, delimiter=", ", suggestions=True):
         """Build a reusable ordered-field editor.
 
-        delimiter controls how the visible row order is serialized. Costs
-        use " + " while most CSV fields use commas.
+        delimiter controls how the visible row order is serialized.
+        Costs use " + " while most CSV fields use commas.
         """
         super().__init__()
         self.conditional = conditional
@@ -343,9 +341,7 @@ class ElementList(QWidget):
 
     def values(self):
         """Return row text in the current visual order."""
-        return [
-            row.label.text() for row in self.items.rows
-        ]
+        return [row.label.text() for row in self.items.rows]
 
     def serialized(self):
         """Serialize ordered resources in the renderer's " + " format."""
@@ -603,11 +599,7 @@ class CardEditor(QWidget):
         form.addRow("Traits", self.traits)
         tribes = self._unique_tribes()
         for name, suggested in (("Tribes", True), ("Token", False), ("Credit", True)):
-            widget = ElementList(
-                name,
-                tribes if name == "Tribes" else self._unique_column_values("Credit"),
-                suggestions=name != "Token",
-            )
+            widget = ElementList(name, tribes if name == "Tribes" else self._unique_column_values("Credit"), suggestions=name != "Token")
             widget.delimiter = " " if name == "Tribes" else ", "
             widget.changed.connect(self._changed)
             self.fields[name] = widget
@@ -767,21 +759,14 @@ class CardEditor(QWidget):
         """Repopulate the card selector while retaining the displayed text."""
         self.search.blockSignals(True)
         self.search.clear()
-        self.search.addItems([
-            strip_rich_text_tags(row.get("Card Name", "")).strip()
-            for row in self.rows
-        ])
+        self.search.addItems([strip_rich_text_tags(row.get("Card Name", "")).strip() for row in self.rows])
         self.search.setCurrentText(strip_rich_text_tags(text).strip())
         self.search.blockSignals(False)
 
     def _filter_cards(self, text):
         """Filter card names as the user types without loading a card."""
         query = strip_rich_text_tags(text).strip().casefold()
-        matches = [
-            strip_rich_text_tags(row.get("Card Name", "")).strip()
-            for row in self.rows
-            if query in strip_rich_text_tags(row.get("Card Name", "")).strip().casefold()
-        ]
+        matches = [strip_rich_text_tags(row.get("Card Name", "")).strip() for row in self.rows if query in strip_rich_text_tags(row.get("Card Name", "")).strip().casefold()]
         self.search.blockSignals(True)
         self.search.clear()
         self.search.addItems(matches)
@@ -792,10 +777,7 @@ class CardEditor(QWidget):
         """Load the exact selected card after the user presses Load."""
         name = self.search.currentText().strip()
         query = strip_rich_text_tags(name).strip().casefold()
-        matches = [
-            i for i, row in enumerate(self.rows)
-            if strip_rich_text_tags(row.get("Card Name", "")).strip().casefold() == query
-        ]
+        matches = [i for i, row in enumerate(self.rows) if strip_rich_text_tags(row.get("Card Name", "")).strip().casefold() == query]
         if matches and self._confirm_navigation():
             self._select_index(matches[0])
 
@@ -816,14 +798,7 @@ class CardEditor(QWidget):
             self.fields[name].setText(row.get(name, ""))
         for name in ("Temple", "Tier"):
             self.fields[name].setCurrentText(row.get(name, ""))
-        background = next(
-            (
-                tag[:-3]
-                for tag in _split(row.get("Tags", ""))
-                if tag.lower().endswith("_bg") and tag[:-3]
-            ),
-            "",
-        ).lower()
+        background = next((tag[:-3] for tag in _split(row.get("Tags", "")) if tag.lower().endswith("_bg") and tag[:-3]), "").lower()
         self.background.setCurrentText(background)
         self.art.setText(row.get("Art File", ""))
         for name in ("Power", "Health"):
@@ -925,8 +900,7 @@ class CardEditor(QWidget):
         """Ask before discarding edits when changing the active card."""
         if not self._dirty():
             return True
-        result = QMessageBox.warning(self, "Unsaved changes", "Discard unsaved changes?",
-                                      QMessageBox.Discard | QMessageBox.Cancel, QMessageBox.Cancel)
+        result = QMessageBox.warning(self, "Unsaved changes", "Discard unsaved changes?", QMessageBox.Discard | QMessageBox.Cancel, QMessageBox.Cancel)
         return result == QMessageBox.Discard
 
     def _new_card(self):
@@ -942,9 +916,7 @@ class CardEditor(QWidget):
 
     def _choose_art(self):
         """Choose art from the configured card-art directory."""
-        filename, _ = QFileDialog.getOpenFileName(
-            self, "Choose card art", str(ASSET_PATH), "Images (*.png *.jpg *.jpeg)"
-        )
+        filename, _ = QFileDialog.getOpenFileName(self, "Choose card art", str(ASSET_PATH), "Images (*.png *.jpg *.jpeg)")
         if filename:
             selected = Path(filename)
             self.art.setText(selected.name if selected.parent.resolve() == ASSET_PATH.resolve() else str(selected))
@@ -984,17 +956,13 @@ class CardEditor(QWidget):
         if export:
             try:
                 image = cards.create_card(row)
-                target = ROOT / "exports" / "cards" / f"{row['Card Name']}.png"
+                target = ROOT / "exports" / "cards" / row['Temple'] / row['Tier'] / f"{row['Card Name']}.png"
                 target.parent.mkdir(parents=True, exist_ok=True)
                 image.save(target)
             except Exception as error:
                 QMessageBox.critical(self, "Export failed", str(error))
                 return False
-            QMessageBox.information(
-                self,
-                "Card exported",
-                f"{row['Card Name']} was exported to {target}.",
-            )
+            QMessageBox.information(self, "Card exported", f"{row['Card Name']} was exported to {target}.")
         self._render_preview()
         return True
 
@@ -1002,15 +970,13 @@ class CardEditor(QWidget):
         """Delete the active card after confirmation and optional export cleanup."""
         if self.current_index < 0:
             return
-        result = QMessageBox.warning(self, "Delete card", "Delete this card?",
-                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        result = QMessageBox.warning(self, "Delete card", "Delete this card?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if result != QMessageBox.Yes:
             return
         row = self.rows.pop(self.current_index)
         self._refresh_background_suggestions()
         exports = ROOT / "exports" / "cards"
-        if QMessageBox.question(self, "Delete exports?", "Also delete exports for this card?",
-                                QMessageBox.Yes | QMessageBox.No) == QMessageBox.Yes:
+        if QMessageBox.question(self, "Delete exports?", "Also delete exports for this card?", QMessageBox.Yes | QMessageBox.No) == QMessageBox.Yes:
             for candidate in (exports / f"{row['Card Name']}.png", exports / f"{row['Art File']}.png"):
                 if candidate.is_file():
                     candidate.unlink()

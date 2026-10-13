@@ -66,10 +66,7 @@ class WelcomePage(QWidget):
         title.setObjectName("pageTitle")
         layout.addWidget(title)
 
-        description = QLabel(
-            "Use the tabs above to edit card data, configure layouts, manage "
-            "assets, and prepare exports."
-        )
+        description = QLabel("Use the tabs above to edit card data, configure layouts, manage assets, and prepare exports.")
         description.setObjectName("pageDescription")
         description.setWordWrap(True)
         layout.addWidget(description)
@@ -95,38 +92,23 @@ class WelcomePage(QWidget):
 class EditorWindow(QMainWindow):
     TAB_DEFINITIONS = (
         ("Overview", WelcomePage),
-        (
-            "Card Editor",
-            None,
-        ),
-        (
-            "Sigil/Trait Editor",
-            None,
-        ),
-        (
+        ("Card Editor", None),
+        ("Sigil/Trait Editor", None),
+        ("Template Editor", lambda: EditorPage(
             "Template Editor",
-            lambda: EditorPage(
-                "Template Editor",
-                "Tweak positioning and assets for all the different card templates.",
-                "Temple and tier layout controls will appear here.",
-            ),
-        ),
-        (
+            "Tweak positioning and assets for all the different card templates.",
+            "Temple and tier layout controls will appear here.",
+        )),
+        ("Config Editor", lambda: EditorPage(
             "Config Editor",
-            lambda: EditorPage(
-                "Config Editor",
-                "Edit global formatter options and printing formats.",
-                "Configuration fields and save actions will appear here.",
-            ),
-        ),
-        (
+            "Edit global formatter options and printing formats.",
+            "Configuration fields and save actions will appear here.",
+        )),
+        ("Export", lambda: EditorPage(
             "Export",
-            lambda: EditorPage(
-                "Export",
-                "Render cards, sigils, and traits in bulk using the current settings.",
-                "Export selection, progress, and output controls will appear here.",
-            ),
-        ),
+            "Render cards, sigils, and traits in bulk using the current settings.",
+            "Export selection, progress, and output controls will appear here.",
+        )),
     )
 
     def __init__(self):

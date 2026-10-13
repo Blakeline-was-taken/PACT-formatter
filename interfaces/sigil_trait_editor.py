@@ -278,9 +278,7 @@ class SigilTraitEditor(QWidget):
         icon_path = SIGIL_ICON_DIR / f"{icon_name}_outline.png"
         self.colorless_icon_edit.setText(icon_path.name if icon_name and icon_path.is_file() else "")
         conduit_icon_path = CONDUIT_SIGIL_ICON_DIR / f"{row.get('Name', '').replace(' ', '')}.png"
-        self.conduit_icon_edit.setText(
-            conduit_icon_path.name if row.get("Name") and conduit_icon_path.is_file() else ""
-        )
+        self.conduit_icon_edit.setText(conduit_icon_path.name if row.get("Name") and conduit_icon_path.is_file() else "")
 
         tags = set(_split(row.get("Tags", "")))
         for tag, check in self.tag_checks.items():
@@ -291,11 +289,7 @@ class SigilTraitEditor(QWidget):
 
     def _update_conduit_icon_visibility(self):
         """Offer conduit-image selection only for conduit sigils."""
-        is_conduit = (
-            self.current_section == "Sigils"
-            and self.type_combo.currentText() == "Sigil"
-            and self.tag_checks["conduit_sigil"].isChecked()
-        )
+        is_conduit = (self.current_section == "Sigils" and self.type_combo.currentText() == "Sigil" and self.tag_checks["conduit_sigil"].isChecked())
         self.conduit_icon_row.setVisible(is_conduit)
         self.conduit_icon_label.setVisible(is_conduit)
 
@@ -309,12 +303,7 @@ class SigilTraitEditor(QWidget):
         name = self.name_edit.text().strip()
         description = self.description_edit.text().strip()
         tags = [tag for tag, check in self.tag_checks.items() if check.isChecked()]
-        return {
-            "Name": name,
-            "Description": description,
-            "Tags": _join(tags),
-            "Type": self.type_combo.currentText(),
-        }
+        return {"Name": name, "Description": description, "Tags": _join(tags), "Type": self.type_combo.currentText()}
 
     def _changed(self):
         if not self.loading:
@@ -348,23 +337,9 @@ class SigilTraitEditor(QWidget):
                 current.append(name)
             else:
                 current.append(name)
-            return {
-                "Type": "Sigil",
-                "Name": name,
-                "Description": description,
-                "Tags": row["Tags"],
-                "Sigils": ", ".join(current),
-                "Traits": "",
-            }
+            return {"Type": "Sigil", "Name": name, "Description": description, "Tags": row["Tags"], "Sigils": ", ".join(current), "Traits": ""}
 
-        return {
-            "Type": "Trait",
-            "Name": name,
-            "Description": description,
-            "Tags": row["Tags"],
-            "Sigils": "",
-            "Traits": name,
-        }
+        return {"Type": "Trait", "Name": name, "Description": description, "Tags": row["Tags"], "Sigils": "", "Traits": name}
 
     def _render_preview(self):
         try:
@@ -383,6 +358,9 @@ class SigilTraitEditor(QWidget):
                     if key == current_name:
                         del sigils.SIGILS[key]
 
+            card_tags = f"{current_name}_left_symbol, {current_name}_right_symbol"
+            if "mox_" in current_tags:
+                card_tags += ", mox_indicator"
             preview_row = {
                 "Card Name": "",
                 "Art File": "",
@@ -397,7 +375,7 @@ class SigilTraitEditor(QWidget):
                 "Tribes": "",
                 "Flavor Text": "",
                 "Credit": "",
-                "Tags": "mox_indicator" if "mox_" in current_tags else "",
+                "Tags": card_tags,
             }
             image = cards.create_card(preview_row)
             pixmap = self._pixmap_for(image)
@@ -415,25 +393,14 @@ class SigilTraitEditor(QWidget):
 
     def _choose_icon(self, colorless=False, conduit=False):
         name = self.name_edit.text().strip()
-        icon_to_edit = (
-            self.conduit_icon_edit
-            if conduit
-            else self.colorless_icon_edit
-            if colorless
-            else self.icon_edit
-        )
+        icon_to_edit = (self.conduit_icon_edit if conduit else self.colorless_icon_edit if colorless else self.icon_edit)
         if not name:
             QMessageBox.warning(self, "Missing name", "Enter a name before choosing an icon.")
             return
 
         icon_dir = CONDUIT_SIGIL_ICON_DIR if conduit else SIGIL_ICON_DIR
         title = "Choose conduit image" if conduit else "Choose sigil icon"
-        filename, _ = QFileDialog.getOpenFileName(
-            self,
-            title,
-            str(icon_dir),
-            "Images (*.png *.jpg *.jpeg *.bmp *.webp)",
-        )
+        filename, _ = QFileDialog.getOpenFileName(self, title, str(icon_dir), "Images (*.png *.jpg *.jpeg *.bmp *.webp)")
         if not filename:
             return
 
@@ -445,13 +412,7 @@ class SigilTraitEditor(QWidget):
             icon_to_edit.setText(str(target.name))
             return
         if target.exists() and source.resolve() != target.resolve():
-            result = QMessageBox.warning(
-                self,
-                "Overwrite image?",
-                f"Replace the existing {target.name} image?",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No,
-            )
+            result = QMessageBox.warning(self, "Overwrite image?", f"Replace the existing {target.name} image?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
             if result != QMessageBox.Yes:
                 return
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -471,13 +432,7 @@ class SigilTraitEditor(QWidget):
             self.colorless_icon_edit.setText("")
             return
 
-        result = QMessageBox.warning(
-            self,
-            "Delete icon?",
-            f"Are you sure you want to delete {target.name}?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
-        )
+        result = QMessageBox.warning(self, "Delete icon?", f"Are you sure you want to delete {target.name}?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if result == QMessageBox.Yes:
             try:
                 target.unlink()
@@ -502,24 +457,12 @@ class SigilTraitEditor(QWidget):
 
         old_name = self.current_name
         if old_name and old_name != name and source_section != target_section:
-            warning = QMessageBox.warning(
-                self,
-                "Type change",
-                f"Changing '{old_name}' from {current_type} to {target_type} will remove the old entry and create a new one in the {target_type.lower()} file. Continue?",
-                QMessageBox.Yes | QMessageBox.Cancel,
-                QMessageBox.Cancel,
-            )
+            warning = QMessageBox.warning(self, "Type change", f"Changing '{old_name}' from {current_type} to {target_type} will remove the old entry and create a new one in the {target_type.lower()} file. Continue?", QMessageBox.Yes | QMessageBox.Cancel, QMessageBox.Cancel)
             if warning != QMessageBox.Yes:
                 return False
 
         if old_name and old_name != name and source_section != target_section:
-            prompt = QMessageBox.question(
-                self,
-                "Update related cards?",
-                f"Update cards that reference '{old_name}' so they move it from {source_section.lower()} to {target_section.lower()}?",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No,
-            )
+            prompt = QMessageBox.question(self, "Update related cards?", f"Update cards that reference '{old_name}' so they move it from {source_section.lower()} to {target_section.lower()}?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
             if prompt == QMessageBox.Yes:
                 self._update_cards_for_type_change(old_name, name, source_section, target_section)
 
@@ -532,30 +475,15 @@ class SigilTraitEditor(QWidget):
         self._render_preview()
 
         if export:
-            export_dir = ROOT / "exports" / ("sigils" if target_type == "Sigil" else "traits")
+            if target_type == "Sigil":
+                img = sigils.SIGILS[self.current_name].getImage(config=DEFAULT_CONFIG, color_map=sigils.get_color_mapping("default"))
+                export_dir = ROOT / "exports" / "sigils"
+            else:
+                img = sigils.TRAITS[self.current_name].getImage(config=DEFAULT_CONFIG, color_map=sigils.get_color_mapping("default"))
+                export_dir = ROOT / "exports" / "traits"
             export_dir.mkdir(parents=True, exist_ok=True)
-            preview_row = self._preview_entry()
-            preview_row["Card Name"] = ""
-            preview_row["Temple"] = "beast"
-            preview_row["Tier"] = "common"
-            preview_image = cards.create_card({
-                "Card Name": "",
-                "Art File": "",
-                "Temple": "beast",
-                "Tier": "common",
-                "Power": "0",
-                "Health": "0",
-                "Cost": "",
-                "Sigils": preview_row.get("Sigils", ""),
-                "Token": "",
-                "Traits": preview_row.get("Traits", ""),
-                "Tribes": "",
-                "Flavor Text": "",
-                "Credit": "",
-                "Tags": "",
-            })
             target = export_dir / f"{name}.png"
-            preview_image.save(target)
+            img.save(target)
             QMessageBox.information(self, "Exported", f"{name} was exported to {target}.")
         return True
 
@@ -608,13 +536,7 @@ class SigilTraitEditor(QWidget):
             return
         if self.current_section not in self.data:
             return
-        result = QMessageBox.warning(
-            self,
-            "Delete item",
-            f"Delete '{self.current_name}' from the {self.current_section.lower()} file?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
-        )
+        result = QMessageBox.warning(self, "Delete item", f"Delete '{self.current_name}' from the {self.current_section.lower()} file?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if result != QMessageBox.Yes:
             return
 

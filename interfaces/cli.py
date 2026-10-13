@@ -190,16 +190,12 @@ try:
                 save_image(img, "exports/sigils/" + sigil.name + ".png")
 
             if DEFAULT_CONFIG["export_shorter_formatting"]:
-                save_image(
-                    sigil.getImage(shortened_format=True, color=color, config=DEFAULT_CONFIG, color_map=color_map),
-                    "exports/short sigils/" + sigil.name + ".png"
-                )
+                img = sigil.getImage(shortened_format=True, color=color, config=DEFAULT_CONFIG, color_map=color_map)
+                save_image(img, "exports/short sigils/" + sigil.name + ".png")
 
             if DEFAULT_CONFIG["export_base_game_formatting"]:
-                save_image(
-                    sigil.getImage(base_game=True, color=color, config=DEFAULT_CONFIG, color_map=color_map),
-                    "exports/base game sigils/" + sigil.name + ".png"
-                )
+                img = sigil.getImage(base_game=True, color=color, config=DEFAULT_CONFIG, color_map=color_map)
+                save_image(img, "exports/base game sigils/" + sigil.name + ".png")
 
             if DEFAULT_CONFIG["export_sigil_patches"]:
                 sigil_img = sigil.sigilImage(color=color)
@@ -211,10 +207,7 @@ try:
             if DEFAULT_CONFIG["export_sigil_description_icon"]:
                 icon = sigils.get_resized_image(
                     sigil.sigilImage(color=color),
-                    get_inline_icon_size(
-                        sigil.get_description(),
-                        ImageFont.truetype(FONT, DEFAULT_CONFIG["sigil_description_font_size"])
-                    )
+                    get_inline_icon_size(sigil.get_description(), ImageFont.truetype(FONT, DEFAULT_CONFIG["sigil_description_font_size"]))
                 )
                 save_image(icon, "exports/sigil icons/" + sigil.name + "_icon.png")
 
