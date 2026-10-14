@@ -57,6 +57,7 @@ class DraggableRow(QFrame):
     """Base row that supports custom drag-and-drop reordering."""
 
     removeRequested = Signal()
+    changed = Signal()
 
     def __init__(self, parent=None):
         """Initialize row styling, drag state, and the shared row contract."""
@@ -236,13 +237,16 @@ class CostRow(DraggableRow):
         super().__init__(parent)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(6, 0, 6, 0)
-        self.label = QLabel(resource)
+        self.label = QLineEdit(resource)
+        self.label.setFrame(False)
+        self.label.textChanged.connect(self.changed)
         self.amount = QSpinBox()
         self.amount.setRange(0, 99)
         self.amount.setValue(amount)
         self.amount.setFixedWidth(78)
         self.amount.setMinimumHeight(28)
         self.amount.setEnabled(enabled)
+        self.amount.valueChanged.connect(self.changed)
         layout.addWidget(self.label, 1)
         layout.addWidget(self.amount)
         self._add_remove_button(layout)
@@ -250,14 +254,15 @@ class CostRow(DraggableRow):
 
 class SigilRow(DraggableRow):
     """Sigil row with a per-sigil conditional and gem selection."""
-    changed = Signal()
 
     def __init__(self, name, conditional="None", gems="", parent=None):
         """Create a sigil row and restore its conditional gem state."""
         super().__init__(parent)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(6, 0, 6, 0)
-        self.label = QLabel(name)
+        self.label = QLineEdit(name)
+        self.label.setFrame(False)
+        self.label.textChanged.connect(self.changed)
         self.conditional = NoWheelComboBox()
         self.conditional.addItems(["None", "Cell", "Latch", "Hint", "Gemified"])
         self.conditional.setCurrentText(conditional)
@@ -279,7 +284,9 @@ class BasicRow(DraggableRow):
         super().__init__(parent)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(6, 0, 6, 0)
-        self.label = QLabel(value)
+        self.label = QLineEdit(value)
+        self.label.setFrame(False)
+        self.label.textChanged.connect(self.changed)
         layout.addWidget(self.label, 1)
         self._add_remove_button(layout)
 
@@ -328,6 +335,7 @@ class ElementList(QWidget):
         value = self._input_text().strip()
         if value:
             row = BasicRow(value)
+            row.changed.connect(self.changed)
             self.items.add_row(row)
             self._clear_input()
             self.changed.emit()
@@ -337,6 +345,7 @@ class ElementList(QWidget):
         self.items.clear_rows()
         for value in values:
             row = BasicRow(value)
+            row.changed.connect(self.changed)
             self.items.add_row(row)
 
     def values(self):
@@ -369,7 +378,7 @@ class CostList(ElementList):
         if not value:
             return
         row = CostRow(value, enabled=value not in ("asterisk", "free"))
-        row.amount.valueChanged.connect(self.changed)
+        row.changed.connect(self.changed)
         self.items.add_row(row)
         self._clear_input()
         self.changed.emit()
@@ -394,7 +403,7 @@ class CostList(ElementList):
             if "_" in value:
                 amount, resource = 0, value.strip()
             row = CostRow(resource, amount, enabled="_" not in value and resource not in ("asterisk", "free"))
-            row.amount.valueChanged.connect(self.changed)
+            row.changed.connect(self.changed)
             self.items.add_row(row)
 
     def serialized(self):
@@ -441,8 +450,8 @@ class SigilList(ElementList):
         if not value:
             return
         row = SigilRow(value)
-        row.conditional.currentTextChanged.connect(self.changed)
         row.changed.connect(self.changed)
+        row.conditional.currentTextChanged.connect(self.changed)
         self.items.add_row(row)
         self._clear_input()
         self.changed.emit()
@@ -453,8 +462,8 @@ class SigilList(ElementList):
         for value in values:
             name, conditional, gems = self._parse(value)
             row = SigilRow(name, conditional, gems)
-            row.conditional.currentTextChanged.connect(self.changed)
             row.changed.connect(self.changed)
+            row.conditional.currentTextChanged.connect(self.changed)
             self.items.add_row(row)
 
     def values(self):
