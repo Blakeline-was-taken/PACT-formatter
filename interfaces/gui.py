@@ -1,9 +1,4 @@
-"""Tabbed graphical editor shell for the PACT formatter.
-
-The editor pages intentionally contain only their navigation and empty states for
-now. Keeping each page as a normal QWidget gives later editors a stable place to
-add controls without changing the application shell.
-"""
+"""Tabbed graphical editor shell for the PACT formatter."""
 
 import sys
 

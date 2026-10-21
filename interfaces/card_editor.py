@@ -294,14 +294,13 @@ class ElementList(QWidget):
     """Search-and-list editor for ordered card fields."""
     changed = Signal()
 
-    def __init__(self, title, options, conditional=False, delimiter=", ", suggestions=True):
+    def __init__(self, title, options, delimiter=", ", suggestions=True):
         """Build a reusable ordered-field editor.
 
         delimiter controls how the visible row order is serialized.
         Costs use " + " while most CSV fields use commas.
         """
         super().__init__()
-        self.conditional = conditional
         self.delimiter = delimiter
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -607,7 +606,7 @@ class CardEditor(QWidget):
         self.traits.changed.connect(self._changed)
         form.addRow("Traits", self.traits)
         tribes = self._unique_tribes()
-        for name, suggested in (("Tribes", True), ("Token", False), ("Credit", True)):
+        for name in ("Tribes", "Token", "Credit"):
             widget = ElementList(name, tribes if name == "Tribes" else self._unique_column_values("Credit"), suggestions=name != "Token")
             widget.delimiter = " " if name == "Tribes" else ", "
             widget.changed.connect(self._changed)

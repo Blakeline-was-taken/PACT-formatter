@@ -319,24 +319,18 @@ class SigilTraitEditor(QWidget):
         row = self._current_data()
         name = row["Name"] or "Example sigil"
         description = row["Description"]
-        tags = _split(row["Tags"])
         preview_type = row["Type"]
 
         if preview_type == "Sigil":
             conditional = self.preview_condition.currentText()
-            current = []
-            if conditional == "Tribal":
-                current.append("TRIBAL")
-            elif conditional == "Rainbow":
-                current.append("RAINBOW")
-            if conditional in ("Cell", "Latch", "Hint"):
-                current.append(f"{conditional}_{name}")
+            if conditional in ("Tribal", "Rainbow"):
+                current = [conditional.upper(), name]
+            elif conditional in ("Cell", "Latch", "Hint"):
+                current = [f"{conditional}_{name}"]
             elif conditional == "Gemified":
-                current.append(self.preview_gems.value(name))
-            elif conditional == "None":
-                current.append(name)
+                current = [self.preview_gems.value(name)]
             else:
-                current.append(name)
+                current = [name]
             return {"Type": "Sigil", "Name": name, "Description": description, "Tags": row["Tags"], "Sigils": ", ".join(current), "Traits": ""}
 
         return {"Type": "Trait", "Name": name, "Description": description, "Tags": row["Tags"], "Sigils": "", "Traits": name}
@@ -450,7 +444,7 @@ class SigilTraitEditor(QWidget):
             if prompt == QMessageBox.Yes:
                 self._update_cards_for_type_change(old_name, name, source_section, target_section)
 
-        self._write_item(name, data, source_section, target_section)
+        self._write_item(old_name, name, data, target_section)
         self.current_name = name
         self.original = dict(data)
         self.original["Type"] = target_type
@@ -471,18 +465,17 @@ class SigilTraitEditor(QWidget):
             QMessageBox.information(self, "Exported", f"{name} was exported to {target}.")
         return True
 
-    def _write_item(self, name, data, source_section, target_section):
+    def _write_item(self, old_name, name, data, target_section):
         new_row = {"Name": name, "Description": data["Description"], "Tags": data["Tags"]}
-        if source_section == target_section:
-            rows = [row for row in self.data[source_section] if row.get("Name") != name]
-        else:
-            rows = [row for row in self.data[source_section] if row.get("Name") != name]
-            self.data[source_section] = rows
-            self.data[source_section] = [row for row in self.data[source_section] if row.get("Name") != name]
-
-        target_rows = [row for row in self.data.get(target_section, []) if row.get("Name") != name]
-        target_rows.append(new_row)
-        self.data[target_section] = target_rows
+        replaced_names = {name}
+        if old_name:
+            replaced_names.add(old_name)
+        for section in ("Sigils", "Traits"):
+            self.data[section] = [
+                row for row in self.data[section]
+                if row.get("Name") not in replaced_names
+            ]
+        self.data[target_section].append(new_row)
 
         for section, path in (("Sigils", SIGIL_PATH), ("Traits", TRAIT_PATH)):
             rows = self.data.get(section, [])
