@@ -19,6 +19,7 @@ class EditorPage(QWidget):
     """Base page with a consistent heading, description, and empty-state panel."""
 
     def __init__(self, title, description, next_step):
+        """Build a reusable page with a heading and workspace status panel."""
         super().__init__()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(32, 28, 32, 28)
@@ -51,7 +52,10 @@ class EditorPage(QWidget):
 
 
 class WelcomePage(QWidget):
+    """Show a short overview of the available editor tabs."""
+
     def __init__(self):
+        """Build the welcome page's title, introduction, and editor list."""
         super().__init__()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(32, 28, 32, 28)
@@ -85,6 +89,8 @@ class WelcomePage(QWidget):
 
 
 class EditorWindow(QMainWindow):
+    """Own the main window, editor tabs, and application-level actions."""
+
     TAB_DEFINITIONS = (
         ("Overview", WelcomePage),
         ("Card Editor", None),
@@ -103,6 +109,7 @@ class EditorWindow(QMainWindow):
     )
 
     def __init__(self):
+        """Set up the window shell and its initial status message."""
         super().__init__()
         self.setWindowTitle("PACT Formatter")
         self.setMinimumSize(960, 640)
@@ -112,12 +119,14 @@ class EditorWindow(QMainWindow):
         self.statusBar().showMessage("Ready")
 
     def _build_actions(self):
+        """Add application-wide actions to the menu bar."""
         close_action = QAction("Close", self)
         close_action.setShortcut("Ctrl+Q")
         close_action.triggered.connect(self.close)
         self.menuBar().addMenu("File").addAction(close_action)
 
     def _build_tabs(self):
+        """Create each editor page and install it in the central tab widget."""
         from .card_editor import CardEditor
         from .sigil_trait_editor import SigilTraitEditor
         from .template_editor import TemplateEditor
@@ -138,15 +147,18 @@ class EditorWindow(QMainWindow):
             self.tabs.addTab(page_factory(), name)
 
     def _tab_changed(self, index):
+        """Reflect the active tab in the window status bar."""
         tab_name = self.tabs.tabText(index)
         self.statusBar().showMessage(f"{tab_name} selected")
 
 
 def _apply_style(app):
+    """Apply the shared application font, widget style, and color palette."""
     app.setStyle("Fusion")
     app.setFont(QFont("Segoe UI", 10))
     app.setStyleSheet(
         """
+        /* Window surfaces, menus, and tab navigation */
         QMainWindow, QWidget { background: #f5f7fb; color: #202938; }
         QMenuBar, QMenu { background: #ffffff; color: #202938; }
         QTabWidget::pane { border: 1px solid #dce2ec; background: #ffffff; }
@@ -161,6 +173,8 @@ def _apply_style(app):
             background: #ffffff; border-bottom-color: #ffffff;
             margin-top: 0;
         }
+
+        /* Shared input and action-control styling */
         QLineEdit, QComboBox, QSpinBox, QPushButton {
             min-height: 28px;
         }
@@ -181,6 +195,8 @@ def _apply_style(app):
         QCheckBox::indicator:hover { border-color: #3978c5; background: #eef5ff; }
         QCheckBox::indicator:checked { border-color: #2868b2; background: #3978c5; }
         QCheckBox::indicator:checked:hover { background: #2868b2; }
+
+        /* Expandable template section navigation */
         #templateSectionButton, #templateSubsectionButton {
             background: #ffffff; border: 1px solid #cbd5e1; border-radius: 5px;
             color: #334155; padding: 7px 10px; text-align: left;
@@ -192,6 +208,8 @@ def _apply_style(app):
         #templateSectionButton:checked, #templateSubsectionButton:checked {
             background: #dce9fa; border-color: #3978c5; color: #17365d;
         }
+
+        /* Page hierarchy, panels, and status feedback */
         #pageTitle { font-size: 26px; font-weight: 600; }
         #pageDescription { color: #586579; font-size: 13px; }
         #sectionTitle { font-size: 18px; font-weight: 600; }
@@ -208,6 +226,7 @@ def _apply_style(app):
 
 
 def run():
+    """Create and display the GUI, then enter Qt's event loop."""
     app = QApplication.instance() or QApplication(sys.argv)
     _apply_style(app)
     window = EditorWindow()

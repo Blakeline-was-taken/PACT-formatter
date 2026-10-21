@@ -27,229 +27,25 @@ from PySide6.QtWidgets import (
 )
 
 from model import DEFAULT_CONFIG, sigils
-from .gui_helpers import NoWheelComboBox, ROOT, create_card_preview
-
-CONFIG_PATH = ROOT / "config.json"
-COORDINATE_FIELDS = {"power_coord", "health_coord", "left_symbol", "right_symbol", "power_sigil_center", "health_sigil_center"}
-
-TEMPLATE_SECTIONS = {
-    "Formatting": {
-        "write_card_metadata": True,
-        "write_art_credit": True,
-        "show_power_sigil": True,
-        "show_health_sigil": True,
-        "allow_colored_sigils": True,
-        "colorless_symbols": True,
-        "display_tribe_icons": True,
-        "show_conduit_sigil_indicators": True,
-        "center_card_name": True,
-        "traits_at_bottom": True,
-        "allow_card_bottom_removal": True,
-        "allow_default_formatting": True,
-        "allow_shortened_formatting": True,
-        "allow_base_game_display": True,
-    },
-    "Text": {
-        "font": "heavyweight",
-        "name_font_size": 110,
-        "name_max_width": 870,
-        "flavor_text_font_size": 45,
-        "metadata_font_size": 45,
-        "art_credit_font_size": 45,
-        "stats_font_size": 110,
-        "flavor_text_color_index": 6,
-        "metadata_color_index": 6,
-        "art_credit_color_index": 6,
-        "trait_color_index": 6,
-        "name_top_border": 138,
-        "name_left_border": 138,
-        "metadata_top_border": 15,
-        "art_credit_top_border": 1510,
-        "flavor_text_top_border": 962,
-        "flavor_text_left_border": 300,
-        "flavor_text_right_border": 1000,
-        "power_coord": [198, 885],
-        "health_coord": [895, 225],
-        "sigil_name_font_size": 55,
-        "sigil_description_font_size": 45,
-        "trait_description_font_size": 40,
-    },
-    "Indicators": {
-        "indicator_displacement": 15,
-        "left_symbol": [130, 1440],
-        "right_symbol": [1000, 1440],
-        "tribes_top_border": 265,
-        "tribes_left_border": 980,
-        "tribes_vertical_displacement": -1,
-        "extra_cells_top_border": 26,
-        "extra_cells_left_border": 3,
-    },
-    "Cost": {
-        "cost_right_border": 99,
-        "cost_left_border": 67,
-        "cost_bottom_border": 91,
-    },
-    "Sigils": {
-        "sigil_img_scale": 100,
-        "sigil_img_space": 180,
-        "sigil_space": 880,
-        "sigil_vertical_spacing": 5,
-        "sigil_top_displacement": 3,
-        "sigil_left_border": 120,
-        "sigil_bottom_border": 1430,
-        "power_sigil_center": [220, 925],
-        "health_sigil_center": [915, 265],
-        "traitline_vertical_spacing": 6,
-        "trait_vertical_spacing": 0,
-    },
-    "Gemification": {
-        "gemification_font_size": 80,
-        "gemification_health_top_border": 17,
-        "gemification_health_horizontal_center": 101,
-        "gemification_health_text_top_border": 105,
-        "gemification_health_text_horizontal_center": 1015,
-        "gemification_power_bottom_border": 87,
-        "gemification_power_horizontal_center": 9,
-        "gemification_power_text_top_border": 865,
-        "gemification_power_text_horizontal_center": 95,
-        "gemification_cost_bottom_border": 84,
-        "gemification_cost_horizontal_center": 103,
-        "gemification_cost_text_top_border": 835,
-        "gemification_cost_text_horizontal_center": 1035,
-        "cost_right_border_gemification_displacement": -2,
-        "gemification_sigil_top_displacement": 0,
-        "gemification_sigil_bottom_displacement": 0,
-        "gemification_sigil_gems_right_border": 14,
-        "gemification_sigil_small_max_height": 150,
-        "gemification_sigil_medium_max_height": 200,
-    },
-    "Sigil Conditional": {},
-    "Rich Text Colors": {},
-}
-
-SUBSECTION_FIELDS = {
-    "Cost": {
-        "Blood": {"blood_right_displacement": 0},
-        "Bones": {"bone_right_displacement": -1},
-        "Energy": {},
-        "Gems": {"gem_right_displacement": -1},
-        "Asterisk": {"asterisk_right_displacement": -1},
-    },
-    "Sigil Conditional": {
-        "Cell": {
-            "cell_sigil_top_displacement": 0,
-            "cell_sigil_bottom_displacement": 0,
-            "cell_sigil_small_max_height": 150,
-            "cell_sigil_medium_max_height": 200,
-        },
-        "Latch": {
-            "latch_sigil_top_displacement": 0,
-            "latch_sigil_bottom_displacement": 0,
-            "left_latch_head_border": 110,
-            "right_latch_head_border": 1010,
-            "latch_sigil_small_max_height": 150,
-            "latch_sigil_medium_max_height": 200,
-        },
-        "Arcane": {
-            "arcane_sigil_top_displacement": -10,
-            "arcane_sigil_bottom_displacement": -95,
-            "arcane_text": "If you provide 2 mox colors:",
-            "arcane_text_y": 20,
-            "arcane_font_size": 43,
-            "arcane_dark_color_index": 6,
-            "arcane_light_color_index": 5,
-        },
-        "Tribal": {
-            "tribal_sigil_top_displacement": -20,
-            "tribal_sigil_bottom_displacement": -95,
-            "tribal_text": "If this card shares a tribe with another:",
-            "tribal_text_y": 30,
-            "tribal_font_size": 43,
-            "tribal_dark_color_index": 6,
-            "tribal_light_color_index": 5,
-        },
-        "Hint": {"hint_color_index": 6},
-    },
-}
-
-TEMPLATE_DEFAULTS = {
-    **{
-        key: value
-        for section in TEMPLATE_SECTIONS.values()
-        for key, value in section.items()
-    },
-    **{
-        key: value
-        for subsections in SUBSECTION_FIELDS.values()
-        for fields in subsections.values()
-        for key, value in fields.items()
-    },
-}
-
-
-def _layer_paths(temple, tier, modifier):
-    paths = [("default", "default", "default")]
-    if temple != "default":
-        paths.append((temple, "default", "default"))
-    if tier != "default":
-        paths.append(("default", tier, "default"))
-        if temple != "default":
-            paths.append((temple, tier, "default"))
-    if modifier != "default":
-        paths.append(("default", "default", modifier))
-        if temple != "default":
-            paths.append((temple, "default", modifier))
-        if tier != "default":
-            paths.append(("default", tier, modifier))
-            if temple != "default":
-                paths.append((temple, tier, modifier))
-    return paths
-
-
-def _effective_config(config_tree, temple, tier, modifier, exclude_path=None):
-    effective = {}
-    for path in _layer_paths(temple, tier, modifier):
-        if path == exclude_path:
-            continue
-        section = config_tree
-        for key in path:
-            section = section.get(key, {}) if isinstance(section, dict) else {}
-        if isinstance(section, dict):
-            effective.update(section)
-    return effective
-
-
-def _target_layer(config_tree, path, create=False):
-    section = config_tree
-    for key in path:
-        if create:
-            section = section.setdefault(key, {})
-        else:
-            section = section.get(key, {})
-        if not isinstance(section, dict):
-            raise ValueError(f"Configuration layer '{'.'.join(path)}' is not an object.")
-    return section
-
-
-def _read_selector_values(cards_path):
-    temples, tiers, modifiers = set(), set(), set()
-    with cards_path.open("r", newline="", encoding="utf-8-sig") as handle:
-        for row in csv.DictReader(handle):
-            temple = (row.get("Temple") or "").strip()
-            tier = (row.get("Tier") or "").strip()
-            if temple:
-                temples.add(temple)
-            if tier:
-                tiers.add(tier)
-            modifiers.update(tag.strip() for tag in (row.get("Tags") or "").split(",") if tag.strip().lower().endswith("_bg"))
-    sort_values = lambda values: sorted(values, key=str.casefold)
-    return sort_values(temples), sort_values(tiers), sort_values(modifiers)
+from ..gui_helpers import NoWheelComboBox, ROOT, create_card_preview
+from .data import (
+    COORDINATE_FIELDS,
+    SUBSECTION_FIELDS,
+    TEMPLATE_DEFAULTS,
+    TEMPLATE_SECTIONS,
+    effective_config,
+    read_config,
+    read_selector_values,
+    target_layer,
+    write_config,
+)
 
 
 class TemplateEditor(QWidget):
     """Load, edit, preview, and save template values across config layers."""
 
     def __init__(self):
+        """Load template data, initialize editor state, and build the interface."""
         super().__init__()
         self._loading = False
         self._active_section = ""
@@ -270,7 +66,8 @@ class TemplateEditor(QWidget):
         self._config_tree = self._read_config()
 
         try:
-            self._temple_options, self._tier_options, self._modifier_options = _read_selector_values(ROOT / DEFAULT_CONFIG["cards_file_path"])
+            cards_path = ROOT / DEFAULT_CONFIG["cards_file_path"]
+            self._temple_options, self._tier_options, self._modifier_options = read_selector_values(cards_path)
         except (OSError, csv.Error) as error:
             QMessageBox.critical(self, "Could not load template options", str(error))
             self._temple_options, self._tier_options, self._modifier_options = [], [], []
@@ -278,18 +75,18 @@ class TemplateEditor(QWidget):
         self._build_ui()
         self._load_selection(self._loaded_selection)
 
+    # Configuration and main editor layout
+
     def _read_config(self):
+        """Load configuration and display a dialog before propagating read errors."""
         try:
-            with CONFIG_PATH.open("r", encoding="utf-8") as handle:
-                config_tree = json.load(handle)
+            return read_config()
         except (OSError, json.JSONDecodeError) as error:
             QMessageBox.critical(self, "Could not load configuration", str(error))
             raise
-        if not isinstance(config_tree, dict) or not isinstance(config_tree.get("default"), dict):
-            raise ValueError("config.json must contain an object with a 'default' layer.")
-        return config_tree
 
     def _build_ui(self):
+        """Arrange the selector header above the settings and preview panes."""
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 20, 24, 20)
         root.addWidget(self._build_header())
@@ -301,6 +98,7 @@ class TemplateEditor(QWidget):
         root.addWidget(splitter, 1)
 
     def _build_header(self):
+        """Build the temple, tier, and background selectors."""
         box = QGroupBox("Template configuration")
         layout = QHBoxLayout(box)
         self.temple_selector = self._make_selector("Temple", self._temple_options)
@@ -316,6 +114,7 @@ class TemplateEditor(QWidget):
 
     @staticmethod
     def _make_selector(placeholder, values):
+        """Create an editable selector populated with known values."""
         selector = NoWheelComboBox()
         selector.setEditable(True)
         selector.setInsertPolicy(QComboBox.NoInsert)
@@ -326,6 +125,7 @@ class TemplateEditor(QWidget):
         return selector
 
     def _build_sections(self):
+        """Build collapsible settings sections and their optional subsections."""
         container = QWidget()
         outer = QVBoxLayout(container)
         outer.setContentsMargins(0, 0, 8, 0)
@@ -342,6 +142,7 @@ class TemplateEditor(QWidget):
         body_layout.setSpacing(6)
 
         for section_name, options in TEMPLATE_SECTIONS.items():
+            # Each section owns one body; specialized sections add their own UI.
             button = QPushButton(section_name)
             button.setCheckable(True)
             button.setChecked(False)
@@ -355,6 +156,7 @@ class TemplateEditor(QWidget):
             if section_name == "Rich Text Colors":
                 self._build_color_editor(section_layout)
             elif section_name in SUBSECTION_FIELDS:
+                # Cost settings have both shared fields and per-cost subsections.
                 if section_name == "Cost":
                     self._add_fields(section_layout, options)
                 subsection_names = tuple(SUBSECTION_FIELDS[section_name])
@@ -369,13 +171,12 @@ class TemplateEditor(QWidget):
                     sub_button = QPushButton(subsection_name)
                     sub_button.setCheckable(True)
                     sub_button.setObjectName("templateSubsectionButton")
-                    sub_button.clicked.connect(
-                        lambda checked=False, section=section_name, name=subsection_name:
-                        self._open_subsection(section, name)
-                    )
+                    sub_button.clicked.connect(lambda checked=False, section=section_name, name=subsection_name: self._open_subsection(section, name))
                     subsection_nav_layout.addWidget(sub_button)
                     self._subsection_buttons[section_name][subsection_name] = sub_button
                 section_layout.addWidget(subsection_nav)
+
+                # Build one body for each subsection and display only the active one.
                 for subsection_name, fields in SUBSECTION_FIELDS[section_name].items():
                     sub_body = QWidget()
                     sub_layout = QVBoxLayout(sub_body)
@@ -403,10 +204,12 @@ class TemplateEditor(QWidget):
         return container
 
     def _add_fields(self, parent_layout, options):
+        """Create controls for one group of settings and register each control."""
         form = QFormLayout()
         form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         form.setVerticalSpacing(8)
         for key, default_value in options.items():
+            # Coordinate settings are edited as paired X/Y values.
             if isinstance(default_value, list) and key in COORDINATE_FIELDS:
                 field_widget = QWidget()
                 coordinate_layout = QHBoxLayout(field_widget)
@@ -425,7 +228,10 @@ class TemplateEditor(QWidget):
             self._field_controls[key] = control
         parent_layout.addLayout(form)
 
+    # Rich-text palette editing
+
     def _build_color_editor(self, parent_layout):
+        """Add color search, name, palette-entry, and create/remove controls."""
         search_row = QHBoxLayout()
         self.color_search = NoWheelComboBox()
         self.color_search.setEditable(True)
@@ -459,6 +265,7 @@ class TemplateEditor(QWidget):
         parent_layout.addWidget(add_entry)
 
     def _refresh_color_search(self, selected=""):
+        """Refresh color suggestions while preserving the current edit name."""
         names = sorted(self._text_colors, key=str.casefold)
         self.color_search.blockSignals(True)
         self.color_search.clear()
@@ -468,12 +275,14 @@ class TemplateEditor(QWidget):
         self.color_search.blockSignals(False)
 
     def _select_color_from_search(self, index):
+        """Load the color selected from the suggestion list."""
         name = self.color_search.itemText(index)
         self._load_color_editor(name)
         self._request_preview(immediate=True)
         self._update_color_remove_button()
 
     def _select_color_from_search_text(self):
+        """Load a color when its name is entered and confirmed."""
         name = self.color_search.currentText().strip()
         match = next((key for key in self._text_colors if key.casefold() == name.casefold()), None)
         if match is not None:
@@ -482,6 +291,7 @@ class TemplateEditor(QWidget):
             self._update_color_remove_button()
 
     def _load_color_editor(self, name):
+        """Populate the palette controls from one stored color definition."""
         entries = self._color_entries_from_value(name, self._text_colors[name])
         self._editing_color_key = name
         self._loading_color_editor = True
@@ -499,9 +309,13 @@ class TemplateEditor(QWidget):
 
     @staticmethod
     def _color_entries_from_value(name, value):
+        """Validate and decode supported RGB and palette-index color formats."""
+        # A single RGB triplet or index is accepted alongside a list of entries.
         if isinstance(value, dict) and set(value) == {"index"}:
             entries = [value]
-        elif isinstance(value, list) and len(value) == 3 and all(isinstance(channel, int) and not isinstance(channel, bool) and 0 <= channel <= 255 for channel in value):
+        elif isinstance(value, list) and len(value) == 3 and all(
+                isinstance(channel, int) and not isinstance(channel, bool) and 0 <= channel <= 255 for channel in value
+            ):
             entries = [value]
         elif isinstance(value, list) and value:
             entries = value
@@ -509,19 +323,24 @@ class TemplateEditor(QWidget):
             raise ValueError(f"Text color '{name}' has an unsupported value.")
 
         parsed = []
+
+        # Validate each palette member before it reaches the numeric controls.
         for entry in entries:
             if isinstance(entry, dict) and set(entry) == {"index"}:
                 index = entry["index"]
                 if not isinstance(index, int) or isinstance(index, bool) or not 1 <= index <= 1_000_000:
                     raise ValueError(f"Text color '{name}' contains an invalid palette index.")
                 parsed.append(("Color index", index))
-            elif isinstance(entry, list) and len(entry) == 3 and all(isinstance(channel, int) and not isinstance(channel, bool) and 0 <= channel <= 255 for channel in entry):
+            elif isinstance(entry, list) and len(entry) == 3 and all(
+                    isinstance(channel, int) and not isinstance(channel, bool) and 0 <= channel <= 255 for channel in entry
+                ):
                 parsed.append(("RGB color", entry))
             else:
                 raise ValueError(f"Text color '{name}' contains an unsupported palette entry.")
         return parsed
 
     def _clear_color_entries(self):
+        """Remove palette-entry widgets and reset their backing records."""
         while self.color_entries_layout.count():
             item = self.color_entries_layout.takeAt(0)
             widget = item.widget()
@@ -530,6 +349,7 @@ class TemplateEditor(QWidget):
         self._color_entries.clear()
 
     def _add_color_entry(self, entry_type="RGB color", value=None):
+        """Create a palette row with either RGB channels or a color index."""
         row = QWidget()
         layout = QHBoxLayout(row)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -565,10 +385,18 @@ class TemplateEditor(QWidget):
         remove = QPushButton("Remove")
         remove.clicked.connect(lambda: self._remove_color_entry(row))
         layout.addWidget(remove)
-        record = {"row": row, "type": type_selector, "index": index, "rgb_widget": rgb_widget, "rgb": (red, green, blue), "remove": remove}
+        record = {
+            "row": row,
+            "type": type_selector,
+            "index": index,
+            "rgb_widget": rgb_widget,
+            "rgb": (red, green, blue),
+            "remove": remove,
+        }
         self._color_entries.append(record)
         self.color_entries_layout.addWidget(row)
 
+        # Restore a saved value, or initialize a new palette entry to black.
         if isinstance(value, int):
             index.setValue(value)
         elif isinstance(value, list) and len(value) == 3:
@@ -589,12 +417,14 @@ class TemplateEditor(QWidget):
         self._color_editor_changed()
 
     def _update_color_entry_type(self, record, entry_type):
+        """Show only the controls that match a palette row's selected type."""
         is_index = entry_type == "Color index"
         record["index"].setVisible(is_index)
         record["rgb_widget"].setVisible(not is_index)
         self._color_editor_changed()
 
     def _remove_color_entry(self, row):
+        """Remove one palette row and refresh the editor state."""
         record = next(record for record in self._color_entries if record["row"] is row)
         self._color_entries.remove(record)
         self.color_entries_layout.removeWidget(row)
@@ -603,15 +433,18 @@ class TemplateEditor(QWidget):
         self._color_editor_changed()
 
     def _update_color_entry_buttons(self):
+        """Prevent removing the last palette entry from a color."""
         for record in self._color_entries:
             record["remove"].setEnabled(len(self._color_entries) > 1)
 
     def _update_color_remove_button(self):
+        """Enable removal only when the search text matches an existing color."""
         name = self.color_search.currentText().strip()
         exists = any(key.casefold() == name.casefold() for key in self._text_colors)
         self.remove_color_button.setEnabled(exists)
 
     def _remove_selected_color(self):
+        """Remove the selected color and load another color if available."""
         name = self.color_search.currentText().strip()
         match = next((key for key in self._text_colors if key.casefold() == name.casefold()), None)
         if match is None:
@@ -632,6 +465,7 @@ class TemplateEditor(QWidget):
         self._field_changed()
 
     def _color_editor_value(self):
+        """Serialize the current palette rows into the config color format."""
         values = []
         for record in self._color_entries:
             if record["type"].currentText() == "Color index":
@@ -641,6 +475,7 @@ class TemplateEditor(QWidget):
         return values
 
     def _color_editor_changed(self, *args):
+        """Update the in-memory palette when the active color is edited."""
         if self._loading or self._loading_color_editor or self._editing_color_key is None:
             return
         name = self.color_name.text().strip()
@@ -651,9 +486,9 @@ class TemplateEditor(QWidget):
         self._editing_color_key = name
         self._refresh_color_search(name)
         self._request_preview()
-        changed = self._has_unsaved_changes()
 
     def _create_color(self):
+        """Prompt for a unique color name and initialize a black RGB entry."""
         name, accepted = QInputDialog.getText(self, "Create rich text color", "Color name:")
         name = name.strip()
         if not accepted:
@@ -665,20 +500,28 @@ class TemplateEditor(QWidget):
             QMessageBox.warning(self, "Invalid color name", "Color names cannot contain braces.")
             return
         if any(key.casefold() == name.casefold() for key in self._text_colors):
-            QMessageBox.warning(self, "Color already exists", f"A color named '{name}' already exists.")
+            QMessageBox.warning(
+                self,
+                "Color already exists",
+                f"A color named '{name}' already exists.",
+            )
             return
         self._text_colors[name] = [[0, 0, 0]]
         self._load_color_editor(name)
         self._field_changed()
 
+    # Settings controls and card preview
+
     def _make_field_control(self, key, default_value):
+        """Choose a widget based on the setting's default value type."""
         if isinstance(default_value, bool):
             control = QCheckBox()
             control.toggled.connect(self._field_changed)
         elif key == "font":
             control = NoWheelComboBox()
             control.setEditable(False)
-            fonts = {path.stem for path in (ROOT / "data" / "fonts").iterdir() if path.is_file() and path.suffix.lower() == ".ttf"}
+            fonts_dir = ROOT / "data" / "fonts"
+            fonts = {path.stem for path in fonts_dir.iterdir() if path.is_file() and path.suffix.lower() == ".ttf"}
             control.addItems(sorted(fonts, key=str.casefold))
             control.setMaxVisibleItems(12)
             control.currentTextChanged.connect(self._field_changed)
@@ -691,6 +534,7 @@ class TemplateEditor(QWidget):
         return control
 
     def _make_number_control(self, key, value):
+        """Create a bounded numeric control connected to change tracking."""
         control = QSpinBox()
         control.setRange(-1_000_000, 1_000_000)
         control.setValue(value)
@@ -699,6 +543,7 @@ class TemplateEditor(QWidget):
         return control
 
     def _build_preview(self):
+        """Create the preview image, line-count controls, and save action."""
         box = QGroupBox("Card preview")
         layout = QVBoxLayout(box)
         self.preview = QLabel("Load template values")
@@ -721,6 +566,7 @@ class TemplateEditor(QWidget):
         return box
 
     def _make_preview_line_control(self, label, layout):
+        """Add a bounded line-count control to the preview options."""
         layout.addWidget(QLabel(label))
         control = QSpinBox()
         control.setRange(1, 8)
@@ -729,7 +575,10 @@ class TemplateEditor(QWidget):
         layout.addWidget(control, 1)
         return control
 
+    # Selection, loading, and form-state conversion
+
     def _selection_from_header(self):
+        """Normalize the selector values into a config-layer tuple."""
         values = (
             self.temple_selector.currentText().strip(),
             self.tier_selector.currentText().strip(),
@@ -740,6 +589,7 @@ class TemplateEditor(QWidget):
         return temple or "default", tier or "default", modifier or "default"
 
     def _load_requested(self):
+        """Confirm discarding edits before loading the selected config layer."""
         if self._has_unsaved_changes():
             answer = QMessageBox.question(
                 self,
@@ -753,9 +603,12 @@ class TemplateEditor(QWidget):
         self._load_selection(self._selection_from_header())
 
     def _load_selection(self, selection):
+        """Load inherited settings and refresh the controls for one layer."""
         try:
             self._config_tree = self._read_config()
-            self._effective_values = _effective_config(self._config_tree, *selection)
+            self._effective_values = effective_config(self._config_tree, *selection)
+
+            # Start with defaults, then apply values inherited from this layer path.
             values = {key: self._effective_values.get(key, default_value) for key, default_value in TEMPLATE_DEFAULTS.items()}
         except (OSError, json.JSONDecodeError, ValueError) as error:
             QMessageBox.critical(self, "Could not load template settings", str(error))
@@ -764,12 +617,19 @@ class TemplateEditor(QWidget):
         self._loaded_selection = selection
         self._loaded_values = {key: value for key, value in values.items()}
         self._loading = True
+
+        # Update controls without triggering preview work for each individual field.
         for key, value in values.items():
             self._set_control_value(self._field_controls[key], value)
+        # Validate rich-text colors before populating the palette editor.
         text_colors = self._effective_values.get("text_colors", {})
         if not isinstance(text_colors, dict):
             self._loading = False
-            QMessageBox.critical(self, "Could not load template settings", "'text_colors' must be an object.")
+            QMessageBox.critical(
+                self,
+                "Could not load template settings",
+                "'text_colors' must be an object.",
+            )
             return
         try:
             for name, value in text_colors.items():
@@ -800,6 +660,7 @@ class TemplateEditor(QWidget):
 
     @staticmethod
     def _set_control_value(control, value):
+        """Set a setting control from its decoded configuration value."""
         if isinstance(control, QCheckBox):
             control.setChecked(bool(value))
         elif isinstance(control, tuple):
@@ -815,6 +676,7 @@ class TemplateEditor(QWidget):
             control.setText(str(value))
 
     def _toggle_section(self, section_name, checked):
+        """Toggle the active settings section or open another section."""
         if not checked and self._active_section == section_name:
             for button in self._section_buttons.values():
                 button.setChecked(False)
@@ -824,20 +686,18 @@ class TemplateEditor(QWidget):
         self._open_section(section_name)
 
     def _open_section(self, section_name):
+        """Show one settings section and restore its selected subsection."""
         for name, button in self._section_buttons.items():
             is_open = name == section_name
             button.setChecked(is_open)
             self._section_bodies[name].setVisible(is_open)
         self._active_section = section_name
         if section_name in SUBSECTION_FIELDS:
-            self._open_subsection(
-                section_name,
-                self._active_subsection[section_name],
-                render=False,
-            )
+            self._open_subsection(section_name, self._active_subsection[section_name], render=False)
         self._request_preview(immediate=True)
 
     def _open_subsection(self, section_name, subsection_name, render=True):
+        """Select a subsection and optionally request an updated preview."""
         self._active_subsection[section_name] = subsection_name
         for name, button in self._subsection_buttons[section_name].items():
             button.setChecked(name == subsection_name)
@@ -846,9 +706,12 @@ class TemplateEditor(QWidget):
             self._request_preview(immediate=True)
 
     def _values_from_controls(self):
+        """Read and validate every setting value from its editor control."""
         values = {}
         for key, default_value in TEMPLATE_DEFAULTS.items():
             control = self._field_controls[key]
+
+            # Handle compound coordinates and native Qt controls directly.
             if isinstance(control, tuple):
                 values[key] = [axis.value() for axis in control]
             elif isinstance(control, QCheckBox):
@@ -857,6 +720,7 @@ class TemplateEditor(QWidget):
                 values[key] = control.value()
             elif isinstance(control, QComboBox):
                 values[key] = control.currentText()
+            # Text controls need explicit conversion and clear validation errors.
             elif isinstance(default_value, int):
                 text = control.text().strip()
                 try:
@@ -875,26 +739,31 @@ class TemplateEditor(QWidget):
         return values
 
     def _has_unsaved_changes(self):
+        """Compare the active form and palette with their loaded snapshots."""
         try:
             if self._editing_color_key is not None:
                 name = self.color_name.text().strip()
-                if (not name or any(character in name for character in "{}") or any(key != self._editing_color_key and key.casefold() == name.casefold() for key in self._text_colors)):
+                invalid_name = not name or any(character in name for character in "{}")
+                duplicate_name = any(key != self._editing_color_key and key.casefold() == name.casefold() for key in self._text_colors)
+                if invalid_name or duplicate_name:
                     return True
             return (self._values_from_controls() != self._loaded_values or self._text_colors != self._loaded_text_colors)
         except ValueError:
             return True
 
     def _field_changed(self, *args):
+        """Schedule a preview refresh after a setting or color change."""
         if self._loading:
             return
-        changed = self._has_unsaved_changes()
         self._request_preview()
 
     def _request_preview(self, *args, immediate=False):
+        """Debounce preview work unless an immediate refresh was requested."""
         if hasattr(self, "_preview_timer"):
             self._preview_timer.start(0 if immediate else 100)
 
     def _render_preview(self):
+        """Render the current sample card and show recoverable errors in-pane."""
         try:
             values = self._values_from_controls()
             config = dict(self._effective_values)
@@ -902,14 +771,18 @@ class TemplateEditor(QWidget):
             config["text_colors"] = self._text_colors
             image = self._create_preview(config)
             pixmap = QPixmap.fromImage(ImageQt(image))
-            self.preview.setPixmap(pixmap.scaled(320, 420, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            scaled = pixmap.scaled(320, 420, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self.preview.setPixmap(scaled)
         except (OSError, KeyError, ValueError, TypeError, IndexError, RuntimeError) as error:
             self.preview.clear()
             self.preview.setText(f"Preview unavailable: {error}")
 
     def _create_preview(self, config):
+        """Build section-specific sample data and render it with the given config."""
         section = self._active_section or "Formatting"
         subsection = self._active_subsection.get(section, "")
+
+        # Choose sample card content that highlights the selected settings group.
         sample_sigil = ""
         sample_trait = ""
         cost = ""
@@ -983,11 +856,13 @@ class TemplateEditor(QWidget):
             "TemplateIndicators": sigils.Sigil("Template", sigil_desc, "power_sigil, health_sigil, conduit_sigil"),
         }
         previous = {name: sigils.SIGILS.get(name) for name in fake_sigils}
-        fake_trait = sigils.Sigil("TemplateTrait", r" \n".join(["Sample trait line"] * self.preview_trait_lines.value()), "", is_trait=True,)
+        trait_desc = r" \n".join(["Sample trait line"] * self.preview_trait_lines.value())
+        fake_trait = sigils.Sigil("TemplateTrait", trait_desc, "", is_trait=True)
         previous_trait = sigils.TRAITS.get("TemplateTrait")
         sigils.SIGILS.update(fake_sigils)
         sigils.TRAITS["TemplateTrait"] = fake_trait
         try:
+            # Preview-only definitions temporarily replace renderer lookups.
             return create_card_preview(
                 card_name=name,
                 temple=self._loaded_selection[0] if self._loaded_selection[0] != "default" else "test",
@@ -1004,6 +879,7 @@ class TemplateEditor(QWidget):
                 config=config,
             )
         finally:
+            # Restore global renderer state even when rendering raises.
             for name, original in previous.items():
                 if original is None:
                     sigils.SIGILS.pop(name, None)
@@ -1014,7 +890,10 @@ class TemplateEditor(QWidget):
             else:
                 sigils.TRAITS["TemplateTrait"] = previous_trait
 
+    # Configuration persistence
+
     def _save(self):
+        """Persist the active layer, omitting values inherited from parent layers."""
         try:
             values = self._values_from_controls()
             color_name = self.color_name.text().strip()
@@ -1022,19 +901,29 @@ class TemplateEditor(QWidget):
                 raise ValueError("Color names cannot be empty.")
             if any(character in color_name for character in "{}"):
                 raise ValueError("Color names cannot contain braces.")
-            if self._editing_color_key is not None and color_name.casefold() != self._editing_color_key.casefold():
-                if any(key != self._editing_color_key and key.casefold() == color_name.casefold() for key in self._text_colors):
+            renamed_color = self._editing_color_key is not None and color_name.casefold() != self._editing_color_key.casefold()
+            if renamed_color:
+                duplicate_name = any(
+                    key != self._editing_color_key
+                    and key.casefold() == color_name.casefold()
+                    for key in self._text_colors
+                )
+                if duplicate_name:
                     raise ValueError(f"A color named '{color_name}' already exists.")
                 self._color_editor_changed()
             values["text_colors"] = copy.deepcopy(self._text_colors)
             tree = self._read_config()
             selection = self._loaded_selection
             target_path = selection
-            inherited = _effective_config(tree, *selection, exclude_path=target_path)
-            target = _target_layer(tree, target_path, create=True)
+
+            # Compare with parent layers so overrides store only changed values.
+            inherited = effective_config(tree, *selection, exclude_path=target_path)
+            target = target_layer(tree, target_path, create=True)
             if target_path == ("default", "default", "default"):
+                # The root layer defines baseline values instead of overrides.
                 target.update(values)
             else:
+                # Remove overrides that now match inherited values.
                 for key, value in values.items():
                     if key == "text_colors":
                         if value == inherited.get(key, {}):
@@ -1046,7 +935,7 @@ class TemplateEditor(QWidget):
                         target.pop(key, None)
                     else:
                         target[key] = value
-            self._write_config(tree)
+            write_config(tree)
         except (OSError, json.JSONDecodeError, ValueError, TypeError) as error:
             QMessageBox.critical(self, "Could not save template settings", str(error))
             return
@@ -1054,9 +943,13 @@ class TemplateEditor(QWidget):
         QMessageBox.information(self, "Template saved", "Template settings were saved.")
 
     def _restore_defaults(self):
+        """Reset built-in defaults or clear the selected override layer."""
         selection = self._loaded_selection
         is_default = selection == ("default", "default", "default")
-        prompt = "Restore every template setting in the default configuration to its built-in value?" if is_default else "Remove all values from this configuration layer?"
+        if is_default:
+            prompt = "Restore every template setting in the default configuration to its built-in value?"
+        else:
+            prompt = "Remove all values from this configuration layer?"
         answer = QMessageBox.warning(
             self,
             "Restore default settings",
@@ -1068,20 +961,15 @@ class TemplateEditor(QWidget):
             return
         try:
             tree = self._read_config()
-            target = _target_layer(tree, selection, create=is_default)
+            target = target_layer(tree, selection, create=is_default)
             if is_default:
                 target.update(TEMPLATE_DEFAULTS)
                 target["text_colors"] = copy.deepcopy(DEFAULT_CONFIG.get("text_colors", {}))
             else:
                 target.clear()
-            self._write_config(tree)
+            write_config(tree)
         except (OSError, json.JSONDecodeError, ValueError, TypeError) as error:
             QMessageBox.critical(self, "Could not restore template settings", str(error))
             return
         self._load_selection(selection)
         QMessageBox.information(self, "Settings restored", "Template settings were restored.")
-
-    @staticmethod
-    def _write_config(config_tree):
-        serialized = json.dumps(config_tree, indent=4, ensure_ascii=False) + "\n"
-        CONFIG_PATH.write_text(serialized, encoding="utf-8")

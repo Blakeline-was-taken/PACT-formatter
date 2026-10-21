@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLineEdit,
     QPushButton,
-    QWidget
+    QWidget,
 )
 
 from model.cards import create_card
@@ -16,19 +16,52 @@ from model.cards import create_card
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def create_card_preview(card_name="", art_file="", temple="", tier="", cost="", power="", health="",
-    sigils="", token="", traits="", tribes="", flavor_text="", credit="", tags="", config=None):
-    """Create a card image from renderer fields, defaulting unspecified values to empty."""
+def create_card_preview(
+    card_name="",
+    art_file="",
+    temple="",
+    tier="",
+    cost="",
+    power="",
+    health="",
+    sigils="",
+    token="",
+    traits="",
+    tribes="",
+    flavor_text="",
+    credit="",
+    tags="",
+    config=None,
+):
+    """Render a preview card from editor field values.
+
+    The keyword arguments mirror the card CSV columns so previews use the same
+    renderer interface as saved cards.
+    """
     card_data = {
-        "Card Name": card_name, "Art File": art_file, "Temple": temple, "Tier": tier, "Cost": cost, "Power": power, "Health": health,
-        "Sigils": sigils, "Token": token, "Traits": traits, "Tribes": tribes, "Flavor Text": flavor_text, "Credit": credit, "Tags": tags
+        "Card Name": card_name,
+        "Art File": art_file,
+        "Temple": temple,
+        "Tier": tier,
+        "Cost": cost,
+        "Power": power,
+        "Health": health,
+        "Sigils": sigils,
+        "Token": token,
+        "Traits": traits,
+        "Tribes": tribes,
+        "Flavor Text": flavor_text,
+        "Credit": credit,
+        "Tags": tags,
     }
     return create_card(card_data, config)
 
 
 def _split(value):
     """Split a comma-delimited CSV field, treating empty and None as empty."""
-    return [] if not value or value == "None" else [part.strip() for part in value.split(",") if part.strip()]
+    if not value or value == "None":
+        return []
+    return [part.strip() for part in value.split(",") if part.strip()]
 
 
 def _join(values):
@@ -40,6 +73,7 @@ class NoWheelComboBox(QComboBox):
     """Editable selector that lets the parent scroll area consume mouse wheels."""
 
     def wheelEvent(self, event):
+        """Leave wheel scrolling to the enclosing scroll area."""
         event.ignore()
 
 
@@ -49,6 +83,7 @@ class Gemification(QWidget):
     changed = Signal()
 
     def __init__(self, with_text):
+        """Build gem toggles and optionally include an effect-text input."""
         super().__init__()
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -59,6 +94,8 @@ class Gemification(QWidget):
             layout.addWidget(self.effect, 1)
         else:
             self.effect = None
+
+        # Prism replaces individual colors, the other gems can be combined.
         toggles = QHBoxLayout()
         self.checks = {}
         for gem in ("green", "blue", "orange", "prism"):
@@ -70,7 +107,7 @@ class Gemification(QWidget):
         layout.addLayout(toggles, 1)
 
     def _toggle(self, checked):
-        """Enforce Prism's exclusive priority over individual gem colors."""
+        """Keep Prism exclusive while allowing combinations of other gems."""
         if checked and self.sender() is self.checks["prism"]:
             for name, check in self.checks.items():
                 if name != "prism":
@@ -83,6 +120,7 @@ class Gemification(QWidget):
         """Decode a stored gemified value into text and selected gem buttons."""
         parts = value.split("_")
         if self.effect:
+            # The base value is last, text sits between gems and base.
             gem_names = {"green", "blue", "orange", "prism"}
             text_parts = [part for part in parts[:-1] if part.lower() not in gem_names]
             self.effect.setText("_".join(text_parts))

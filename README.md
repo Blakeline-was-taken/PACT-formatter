@@ -97,9 +97,9 @@ python main.py
 
 The initial GUI provides tabs for cards, sigils and traits, templates and layouts, assets, configuration, and exports. These tabs are the foundation for the editors being added in later iterations.
 
-The GUI shell, Card Editor, and legacy CLI are grouped in the `interfaces/` package. The project root keeps `main.py` as the single application entry point, while renderer and data-model code remains in `model/`.
+The GUI shell, editors, and legacy CLI are grouped in the `interfaces/` package. The Card Editor lives in `interfaces/card_editor/`, the Sigil/Trait Editor lives in `interfaces/sigil_trait_editor/` and the Template Editor lives in `interfaces/template_editor/`. The project root has `main.py` as the single application entry point, while renderer and core data-model code are in `model/`.
 
-The legacy command-line exporter remains available while the GUI is being developed:
+The legacy command-line exporter remains available:
 
 ```bash
 python main.py --cli

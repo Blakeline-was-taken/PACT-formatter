@@ -1,3 +1,6 @@
+interfaces/card_editor/__pycache__/
+interfaces/sigil_trait_editor/__pycache__/
+interfaces/template_editor/__pycache__/
 interfaces/__pycache__/
 model/__pycache__/
 exports/

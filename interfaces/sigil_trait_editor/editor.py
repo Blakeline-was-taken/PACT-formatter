@@ -1,4 +1,5 @@
-import csv
+"""Qt interface for editing and previewing sigils and traits."""
+
 import shutil
 from pathlib import Path
 
@@ -20,54 +21,41 @@ from PySide6.QtWidgets import (
 )
 
 from model import DEFAULT_CONFIG, sigils
-from .gui_helpers import Gemification, NoWheelComboBox, ROOT, _split, _join, create_card_preview
-
-SIGIL_PATH = ROOT / DEFAULT_CONFIG["sigils_file_path"]
-TRAIT_PATH = ROOT / DEFAULT_CONFIG["traits_file_path"]
-SIGIL_ICON_DIR = ROOT / DEFAULT_CONFIG["assets_dir"] / "general_assets" / "sigils"
-CONDUIT_SIGIL_ICON_DIR = ROOT / DEFAULT_CONFIG["assets_dir"] / "general_assets" / "conduit_sigil_indicators"
-
-SIGIL_TAG_OPTIONS = [
-    "power_sigil",
-    "health_sigil",
-    "conduit_sigil",
-    "mox_green",
-    "mox_orange",
-    "mox_blue",
-    "mox_prism",
-]
-
-
-def _normalize_sigil_name(name):
-    return name.translate(str.maketrans("", "", " ',-!?"))
-
-
-def _csv_rows(path):
-    try:
-        with path.open("r", newline="", encoding="utf-8") as handle:
-            return [dict(row) for row in csv.DictReader(handle)]
-    except (OSError, csv.Error):
-        return []
+from ..gui_helpers import Gemification, NoWheelComboBox, ROOT, _split, _join, create_card_preview
+from .data import (
+    CONDUIT_SIGIL_ICON_DIR,
+    SIGIL_ICON_DIR,
+    SIGIL_TAG_OPTIONS,
+    SigilTraitRepository,
+    normalize_sigil_name,
+)
 
 
 class SigilTraitEditor(QWidget):
     """Search, edit, preview, and save sigils and traits from their shared CSV files."""
 
     def __init__(self):
+        """Load item data and build the initial editor state."""
         super().__init__()
-        self.data = {"Sigils": _csv_rows(SIGIL_PATH), "Traits": _csv_rows(TRAIT_PATH)}
+        self.repository = SigilTraitRepository()
+        self.data = self.repository.load_items()
         self.current_section = "Sigils"
         self.current_name = ""
         self.original = {}
         self.loading = False
         self._build_ui()
         self._refresh_search()
-        self._select_name(self._names_for_current_section()[0] if self._names_for_current_section() else "")
+        names = self._names_for_current_section()
+        self._select_name(names[0] if names else "")
+
+    # Selection and form construction
 
     def _names_for_current_section(self):
+        """Return available item names for the active category."""
         return [row.get("Name", "") for row in self.data.get(self.current_section, []) if row.get("Name")]
 
     def _build_ui(self):
+        """Arrange selection controls, the editor form, and preview side by side."""
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 20, 24, 20)
         root.addWidget(self._build_header())
@@ -77,7 +65,10 @@ class SigilTraitEditor(QWidget):
         splitter.setSizes([560, 500])
         root.addWidget(splitter, 1)
 
+    # Loading and selecting items
+
     def _build_header(self):
+        """Create the category selector, searchable item list, and new-item action."""
         box = QGroupBox("Sigil/Trait selection")
         layout = QHBoxLayout(box)
         self.category = NoWheelComboBox()
@@ -102,8 +93,11 @@ class SigilTraitEditor(QWidget):
         return box
 
     def _build_form(self):
+        """Build the scrollable item fields and delete action."""
         container = QWidget()
         outer = QVBoxLayout(container)
+
+        # Names and descriptions are shared by both item types.
         title = QLabel("Item data")
         title.setObjectName("sectionTitle")
         outer.addWidget(title)
@@ -130,6 +124,7 @@ class SigilTraitEditor(QWidget):
         self.type_combo.currentTextChanged.connect(self._changed)
         form.addRow("Type", self.type_combo)
 
+        # These paths are discovered from the item name and selected separately.
         self.icon_edit = QLineEdit()
         self.icon_edit.setReadOnly(True)
         choose_icon = QPushButton("Choose icon...")
@@ -138,7 +133,7 @@ class SigilTraitEditor(QWidget):
         icon_row.addWidget(self.icon_edit, 1)
         icon_row.addWidget(choose_icon)
         form.addRow("Icon", icon_row)
-        
+
         self.colorless_icon_edit = QLineEdit()
         self.colorless_icon_edit.setReadOnly(True)
         colorless_choose_icon = QPushButton("Choose colorless icon...")
@@ -161,7 +156,8 @@ class SigilTraitEditor(QWidget):
         conduit_icon_layout.setContentsMargins(0, 0, 0, 0)
         conduit_icon_layout.addWidget(self.conduit_icon_edit, 1)
         conduit_icon_layout.addWidget(conduit_choose_icon)
-        
+
+        # Tags drive renderer behavior; conduit art is only relevant to sigils.
         self.tags = QWidget()
         tags_layout = QVBoxLayout(self.tags)
         self.tag_checks = {}
@@ -187,6 +183,7 @@ class SigilTraitEditor(QWidget):
         return container
 
     def _build_preview(self):
+        """Create the live card preview and save/export actions."""
         box = QGroupBox("Live preview")
         layout = QVBoxLayout(box)
 
@@ -223,11 +220,13 @@ class SigilTraitEditor(QWidget):
         return box
 
     def _switch_section(self, section):
+        """Switch between the sigil and trait collections."""
         self.current_section = section
         self._update_conduit_icon_visibility()
         self._refresh_search()
 
     def _refresh_search(self, text=""):
+        """Rebuild the searchable name list while retaining the selected text."""
         self.search.blockSignals(True)
         self.search.clear()
         self.search.addItems(self._names_for_current_section())
@@ -235,6 +234,7 @@ class SigilTraitEditor(QWidget):
         self.search.blockSignals(False)
 
     def _filter_names(self, text):
+        """Show only active-section names containing the current query."""
         query = text.lower()
         matches = [name for name in self._names_for_current_section() if query in name.lower()]
         self.search.blockSignals(True)
@@ -244,11 +244,13 @@ class SigilTraitEditor(QWidget):
         self.search.blockSignals(False)
 
     def _search_activated(self):
+        """Load the exact item selected in the search control."""
         name = self.search.currentText().strip()
         if name and name in self._names_for_current_section():
             self._select_name(name)
 
     def _select_name(self, name):
+        """Populate the editor from an existing item by name."""
         if not name:
             self._new_item()
             return
@@ -260,26 +262,42 @@ class SigilTraitEditor(QWidget):
         self._refresh_search(name)
         self._render_preview()
 
+    # Preview construction and rendering
+
     def _new_item(self):
+        """Clear the form and prepare a new item in the current category."""
         self.current_name = ""
         self.original = {}
-        self._populate({"Name": "", "Description": "", "Tags": "", "Type": "Sigil" if self.current_section == "Sigils" else "Trait"})
+        item_type = "Sigil" if self.current_section == "Sigils" else "Trait"
+        self._populate({
+            "Name": "",
+            "Description": "",
+            "Tags": "",
+            "Type": item_type,
+        })
         self._render_preview()
 
     def _populate(self, row):
+        """Load item values and discover the corresponding icon files."""
         self.loading = True
+
+        # Load text fields and locate standard, outline, and conduit images.
         self.name_edit.setText(row.get("Name", ""))
         self.description_edit.setText(row.get("Description", ""))
-        self.type_combo.setCurrentText(row.get("Type", "Sigil" if self.current_section == "Sigils" else "Trait"))
-        
-        icon_name = _normalize_sigil_name(row.get("Name", ""))
+        default_type = "Sigil" if self.current_section == "Sigils" else "Trait"
+        self.type_combo.setCurrentText(row.get("Type", default_type))
+
+        icon_name = normalize_sigil_name(row.get("Name", ""))
         icon_path = SIGIL_ICON_DIR / f"{icon_name}.png"
         self.icon_edit.setText(icon_path.name if icon_name and icon_path.is_file() else "")
         icon_path = SIGIL_ICON_DIR / f"{icon_name}_outline.png"
-        self.colorless_icon_edit.setText(icon_path.name if icon_name and icon_path.is_file() else "")
+        colorless_icon = icon_path.name if icon_name and icon_path.is_file() else ""
+        self.colorless_icon_edit.setText(colorless_icon)
         conduit_icon_path = CONDUIT_SIGIL_ICON_DIR / f"{row.get('Name', '').replace(' ', '')}.png"
-        self.conduit_icon_edit.setText(conduit_icon_path.name if row.get("Name") and conduit_icon_path.is_file() else "")
+        conduit_icon = conduit_icon_path.name if row.get("Name") and conduit_icon_path.is_file() else ""
+        self.conduit_icon_edit.setText(conduit_icon)
 
+        # Restore tag toggles before recalculating conditional control visibility.
         tags = set(_split(row.get("Tags", "")))
         for tag, check in self.tag_checks.items():
             check.setChecked(tag in tags)
@@ -289,33 +307,44 @@ class SigilTraitEditor(QWidget):
 
     def _update_conduit_icon_visibility(self):
         """Offer conduit-image selection only for conduit sigils."""
-        is_conduit = (self.current_section == "Sigils" and self.type_combo.currentText() == "Sigil" and self.tag_checks["conduit_sigil"].isChecked())
+        is_conduit = self.current_section == "Sigils" and self.type_combo.currentText() == "Sigil" and self.tag_checks["conduit_sigil"].isChecked()
         self.conduit_icon_row.setVisible(is_conduit)
         self.conduit_icon_label.setVisible(is_conduit)
 
     def _update_preview_visibility(self):
+        """Show conditional controls only when the selected item is a sigil."""
         item_type = self.type_combo.currentText()
         is_sigil = item_type == "Sigil"
         self.preview_condition.setVisible(is_sigil)
-        self.preview_gems.setVisible(is_sigil and self.preview_condition.currentText() == "Gemified")
+        is_gemified = self.preview_condition.currentText() == "Gemified"
+        self.preview_gems.setVisible(is_sigil and is_gemified)
 
     def _current_data(self):
+        """Collect the current form values in the CSV item shape."""
         name = self.name_edit.text().strip()
         description = self.description_edit.text().strip()
         tags = [tag for tag, check in self.tag_checks.items() if check.isChecked()]
-        return {"Name": name, "Description": description, "Tags": _join(tags), "Type": self.type_combo.currentText()}
+        return {
+            "Name": name,
+            "Description": description,
+            "Tags": _join(tags),
+            "Type": self.type_combo.currentText(),
+        }
 
     def _changed(self):
+        """Refresh dependent controls and preview after a user edit."""
         if not self.loading:
             self._update_conduit_icon_visibility()
             self._update_preview_visibility()
             self._render_preview()
 
     def _condition_changed(self):
+        """Update the conditional controls and preview after condition selection."""
         self._update_preview_visibility()
         self._render_preview()
 
     def _preview_entry(self):
+        """Build a sample card entry matching the current preview settings."""
         row = self._current_data()
         name = row["Name"] or "Example sigil"
         description = row["Description"]
@@ -331,27 +360,51 @@ class SigilTraitEditor(QWidget):
                 current = [self.preview_gems.value(name)]
             else:
                 current = [name]
-            return {"Type": "Sigil", "Name": name, "Description": description, "Tags": row["Tags"], "Sigils": ", ".join(current), "Traits": ""}
+            return {
+                "Type": "Sigil",
+                "Name": name,
+                "Description": description,
+                "Tags": row["Tags"],
+                "Sigils": ", ".join(current),
+                "Traits": "",
+            }
 
-        return {"Type": "Trait", "Name": name, "Description": description, "Tags": row["Tags"], "Sigils": "", "Traits": name}
+        return {
+            "Type": "Trait",
+            "Name": name,
+            "Description": description,
+            "Tags": row["Tags"],
+            "Sigils": "",
+            "Traits": name,
+        }
 
     def _render_preview(self):
+        """Render the sample card and show a useful message if rendering fails."""
         try:
             row = self._preview_entry()
             current_name = row["Name"]
             current_description = row["Description"]
             current_tags = row["Tags"]
+
+            # Preview rendering uses global lookup tables so we register the edited
+            # definition and remove any conflicting entry of the other type.
             if row["Type"] == "Sigil":
                 sigils.SIGILS[current_name] = sigils.Sigil(current_name, current_description, current_tags)
                 for key in list(sigils.TRAITS.keys()):
                     if key == current_name:
                         del sigils.TRAITS[key]
             else:
-                sigils.TRAITS[current_name] = sigils.Sigil(current_name, current_description, current_tags, is_trait=True)
+                sigils.TRAITS[current_name] = sigils.Sigil(
+                    current_name,
+                    current_description,
+                    current_tags,
+                    is_trait=True,
+                )
                 for key in list(sigils.SIGILS.keys()):
                     if key == current_name:
                         del sigils.SIGILS[key]
 
+            # Add symbol tags so the preview displays the edited item's icon.
             card_tags = f"{current_name}_left_symbol, {current_name}_right_symbol"
             if "mox_" in current_tags:
                 card_tags += ", mox_indicator"
@@ -364,33 +417,53 @@ class SigilTraitEditor(QWidget):
 
     @staticmethod
     def _pixmap_for(image):
+        """Convert a PIL image into a consistently scaled Qt preview pixmap."""
         from PySide6.QtGui import QPixmap
         from PIL.ImageQt import ImageQt
 
         return QPixmap.fromImage(ImageQt(image)).scaled(320, 420, Qt.KeepAspectRatio, Qt.SmoothTransformation)
 
+    # Icon and item actions
+
     def _choose_icon(self, colorless=False, conduit=False):
+        """Copy a chosen image into the matching configured icon directory."""
         name = self.name_edit.text().strip()
-        icon_to_edit = (self.conduit_icon_edit if conduit else self.colorless_icon_edit if colorless else self.icon_edit)
+        if conduit:
+            icon_to_edit = self.conduit_icon_edit
+        elif colorless:
+            icon_to_edit = self.colorless_icon_edit
+        else:
+            icon_to_edit = self.icon_edit
         if not name:
             QMessageBox.warning(self, "Missing name", "Enter a name before choosing an icon.")
             return
 
         icon_dir = CONDUIT_SIGIL_ICON_DIR if conduit else SIGIL_ICON_DIR
         title = "Choose conduit image" if conduit else "Choose sigil icon"
-        filename, _ = QFileDialog.getOpenFileName(self, title, str(icon_dir), "Images (*.png *.jpg *.jpeg *.bmp *.webp)")
+        filename, _ = QFileDialog.getOpenFileName(
+            self,
+            title,
+            str(icon_dir),
+            "Images (*.png *.jpg *.jpeg *.bmp *.webp)",
+        )
         if not filename:
             return
 
         source = Path(filename)
         outline = "_outline" if colorless else ""
-        target_name = name.replace(" ", "") if conduit else _normalize_sigil_name(name)
+        target_name = name.replace(" ", "") if conduit else normalize_sigil_name(name)
         target = icon_dir / f"{target_name}{outline}.png"
         if source.resolve() == target.resolve():
             icon_to_edit.setText(str(target.name))
             return
         if target.exists() and source.resolve() != target.resolve():
-            result = QMessageBox.warning(self, "Overwrite image?", f"Replace the existing {target.name} image?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            result = QMessageBox.warning(
+                self,
+                "Overwrite image?",
+                f"Replace the existing {target.name} image?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
             if result != QMessageBox.Yes:
                 return
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -399,18 +472,25 @@ class SigilTraitEditor(QWidget):
         self._render_preview()
 
     def _delete_colorless_icon(self):
+        """Confirm and remove the current item's optional outline icon."""
         name = self.name_edit.text().strip()
         if not name:
             return
 
-        icon_name = _normalize_sigil_name(name)
+        icon_name = normalize_sigil_name(name)
         target = SIGIL_ICON_DIR / f"{icon_name}_outline.png"
 
         if not target.is_file():
             self.colorless_icon_edit.setText("")
             return
 
-        result = QMessageBox.warning(self, "Delete icon?", f"Are you sure you want to delete {target.name}?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        result = QMessageBox.warning(
+            self,
+            "Delete icon?",
+            f"Are you sure you want to delete {target.name}?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
         if result == QMessageBox.Yes:
             try:
                 target.unlink()
@@ -421,8 +501,11 @@ class SigilTraitEditor(QWidget):
             self._render_preview()
 
     def _save(self, export=False):
+        """Validate, persist, and optionally export the current item."""
         data = self._current_data()
         name = data["Name"]
+
+        # A type change moves the record between files and may affect card rows.
         if not name:
             QMessageBox.warning(self, "Cannot save item", "Name is required.")
             return False
@@ -435,16 +518,37 @@ class SigilTraitEditor(QWidget):
 
         old_name = self.current_name
         if old_name and old_name != name and source_section != target_section:
-            warning = QMessageBox.warning(self, "Type change", f"Changing '{old_name}' from {current_type} to {target_type} will remove the old entry and create a new one in the {target_type.lower()} file. Continue?", QMessageBox.Yes | QMessageBox.Cancel, QMessageBox.Cancel)
+            warning = QMessageBox.warning(
+                self,
+                "Type change",
+                f"Changing '{old_name}' from {current_type} to {target_type} "
+                f"will remove the old entry and create a new one in the "
+                f"{target_type.lower()} file. Continue?",
+                QMessageBox.Yes | QMessageBox.Cancel,
+                QMessageBox.Cancel,
+            )
             if warning != QMessageBox.Yes:
                 return False
 
         if old_name and old_name != name and source_section != target_section:
-            prompt = QMessageBox.question(self, "Update related cards?", f"Update cards that reference '{old_name}' so they move it from {source_section.lower()} to {target_section.lower()}?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            prompt = QMessageBox.question(
+                self,
+                "Update related cards?",
+                f"Update cards that reference '{old_name}' so they move it "
+                f"from {source_section.lower()} to {target_section.lower()}?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
             if prompt == QMessageBox.Yes:
-                self._update_cards_for_type_change(old_name, name, source_section, target_section)
+                self._update_cards_for_type_change(
+                    old_name,
+                    name,
+                    source_section,
+                    target_section,
+                )
 
-        self._write_item(old_name, name, data, target_section)
+        # Persist once confirmations and any related-card updates are complete.
+        self.data = self.repository.write_item(self.data, old_name, name, data, target_section)
         self.current_name = name
         self.original = dict(data)
         self.original["Type"] = target_type
@@ -452,6 +556,7 @@ class SigilTraitEditor(QWidget):
         self.category.setCurrentText(target_section)
         self._render_preview()
 
+        # Export the matching renderer model after saving the CSV definition.
         if export:
             if target_type == "Sigil":
                 img = sigils.SIGILS[self.current_name].getImage(config=DEFAULT_CONFIG, color_map=sigils.get_color_mapping("default"))
@@ -462,67 +567,35 @@ class SigilTraitEditor(QWidget):
             export_dir.mkdir(parents=True, exist_ok=True)
             target = export_dir / f"{name}.png"
             img.save(target)
-            QMessageBox.information(self, "Exported", f"{name} was exported to {target}.")
+            QMessageBox.information(
+                self,
+                "Exported",
+                f"{name} was exported to {target}.",
+            )
         return True
 
-    def _write_item(self, old_name, name, data, target_section):
-        new_row = {"Name": name, "Description": data["Description"], "Tags": data["Tags"]}
-        replaced_names = {name}
-        if old_name:
-            replaced_names.add(old_name)
-        for section in ("Sigils", "Traits"):
-            self.data[section] = [
-                row for row in self.data[section]
-                if row.get("Name") not in replaced_names
-            ]
-        self.data[target_section].append(new_row)
-
-        for section, path in (("Sigils", SIGIL_PATH), ("Traits", TRAIT_PATH)):
-            rows = self.data.get(section, [])
-            with path.open("w", newline="", encoding="utf-8") as handle:
-                writer = csv.DictWriter(handle, fieldnames=["Name", "Description", "Tags"])
-                writer.writeheader()
-                writer.writerows(rows)
-
     def _update_cards_for_type_change(self, old_name, new_name, source_section, target_section):
-        cards_path = ROOT / DEFAULT_CONFIG["cards_file_path"]
-        try:
-            with cards_path.open("r", newline="", encoding="utf-8") as handle:
-                rows = list(csv.DictReader(handle))
-        except (OSError, csv.Error):
-            return
-
-        source_field = "Sigils" if source_section == "Sigils" else "Traits"
-        target_field = "Sigils" if target_section == "Sigils" else "Traits"
-        for row in rows:
-            source_values = _split(row.get(source_field, ""))
-            if old_name in source_values:
-                source_values = [value for value in source_values if value != old_name]
-                target_values = _split(row.get(target_field, ""))
-                if new_name not in target_values:
-                    target_values.append(new_name)
-                row[source_field] = _join(source_values)
-                row[target_field] = _join(target_values)
-        with cards_path.open("w", newline="", encoding="utf-8") as handle:
-            writer = csv.DictWriter(handle, fieldnames=list(rows[0].keys()) if rows else ["Card Name", "Art File", "Temple", "Tier", "Cost", "Power", "Health", "Sigils", "Token", "Traits", "Tribes", "Flavor Text", "Credit", "Tags"])
-            writer.writeheader()
-            writer.writerows(rows)
+        """Move card references after the user approves an item type change."""
+        self.repository.update_card_references(old_name, new_name, source_section, target_section)
 
     def _delete_item(self):
+        """Confirm deletion, persist it, and reset the editor to a new item."""
         if not self.current_name:
             return
         if self.current_section not in self.data:
             return
-        result = QMessageBox.warning(self, "Delete item", f"Delete '{self.current_name}' from the {self.current_section.lower()} file?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        result = QMessageBox.warning(
+            self,
+            "Delete item",
+            f"Delete '{self.current_name}' from the "
+            f"{self.current_section.lower()} file?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
         if result != QMessageBox.Yes:
             return
 
-        self.data[self.current_section] = [row for row in self.data[self.current_section] if row.get("Name") != self.current_name]
-        for section, path in (("Sigils", SIGIL_PATH), ("Traits", TRAIT_PATH)):
-            with path.open("w", newline="", encoding="utf-8") as handle:
-                writer = csv.DictWriter(handle, fieldnames=["Name", "Description", "Tags"])
-                writer.writeheader()
-                writer.writerows(self.data.get(section, []))
+        self.data = self.repository.delete_item(self.data, self.current_section, self.current_name)
         self.current_name = ""
         self._refresh_search()
         self._new_item()
