@@ -6,9 +6,12 @@
                 "cards_file_path": "data/cards.csv",
                 "sigils_file_path": "data/sigils.csv",
                 "traits_file_path": "data/traits.csv",
-                
+
+                "default_tier": "common",
                 "write_art_credit": true,
                 "write_card_metadata": true,
+                "allow_colored_sigils": true,
+                "colorless_symbols": true,
                 "show_power_sigil": true,
                 "show_health_sigil": true,
                 "show_conduit_sigil_indicators": true,
@@ -31,7 +34,6 @@
                 "exported_traitline": true,
 
                 "font": "heavyweight",
-                "default_tier": "common",
                 "name_font_size": 110,
                 "name_max_width": 870,
                 "flavor_text_font_size": 45,
@@ -41,6 +43,7 @@
                 "sigil_description_font_size": 45,
                 "trait_description_font_size": 40,
                 "stats_font_size": 110,
+
                 "gemification_font_size": 80,
                 "arcane_font_size": 43,
                 "tribal_font_size": 43,
@@ -121,7 +124,6 @@
                 },
 
                 "sigil_img_scale": 100,
-                "allow_colored_sigils": true,
                 "sigil_img_space": 180,
                 "sigil_space": 880,
 
@@ -130,7 +132,6 @@
                 "trait_vertical_spacing": 0,
 
                 "cost_right_border": 99,
-                "cost_right_border_gemification_displacement": -2,
                 "cost_left_border": 67,
                 "cost_bottom_border": 91,
 
@@ -160,7 +161,6 @@
 
                 "left_symbol": [130, 1440],
                 "right_symbol": [1000, 1440],
-                "colorless_symbols": true,
 
                 "gemification_health_top_border": 17,
                 "gemification_health_horizontal_center": 101,
@@ -176,6 +176,7 @@
                 "gemification_cost_horizontal_center": 103,
                 "gemification_cost_text_top_border": 835,
                 "gemification_cost_text_horizontal_center": 1035,
+                "cost_right_border_gemification_displacement": -2,
 
                 "gemification_sigil_top_displacement": 0,
                 "gemification_sigil_bottom_displacement": 0,
@@ -209,7 +210,8 @@
                 "extra_cells_left_border": 3,
 
                 "tribes_top_border": 265,
-                "tribes_left_border": 980
+                "tribes_left_border": 980,
+                "tribes_vertical_displacement": -5
             },
             "bloodless": {
                 "sigil_bottom_border": 1440,
