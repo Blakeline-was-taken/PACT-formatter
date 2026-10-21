@@ -20,26 +20,31 @@ def resolve_text_color(name, config, color_map):
             raise ValueError(f"Text color '{name}' is ambiguous in config.json.")
         value = matches[0]
 
-    if isinstance(value, dict) and set(value) == {"index"}:
-        index = value["index"]
+    def indexed_color(entry):
+        if not isinstance(entry, dict) or set(entry) != {"index"}:
+            raise ValueError(f"Text color '{name}' must use an RGB list or an object with an 'index' value.")
+        index = entry["index"]
         palette = color_map.get("palette_colors", [])
         if not isinstance(index, int) or isinstance(index, bool) or not 1 <= index <= len(palette):
             raise ValueError(f"Text color '{name}' has an invalid palette index: {index!r}.")
-        value = palette[index - 1][:3]
-    elif isinstance(value, list) and value and isinstance(value[0], list):
-        if any(
-            not isinstance(color, list) or
-            len(color) != 3 or
-            any(not isinstance(channel, int) or isinstance(channel, bool) or not 0 <= channel <= 255 for channel in color)
-        for color in value):
-            raise ValueError(f"Text color palette '{name}' must contain RGB lists with values from 0 to 255.")
-        return tuple(tuple(color) for color in value)
-    elif not isinstance(value, list) or len(value) != 3:
+        return tuple(palette[index - 1][:3])
+
+    def rgb_color(entry):
+        if (not isinstance(entry, list) or len(entry) != 3 or any(not isinstance(channel, int) or isinstance(channel, bool) or not 0 <= channel <= 255 for channel in entry)):
+            raise ValueError(f"Text color '{name}' must contain three RGB values from 0 to 255.")
+        return tuple(entry)
+
+    if isinstance(value, dict) and set(value) == {"index"}:
+        return indexed_color(value)
+    if isinstance(value, list) and value and isinstance(value[0], (list, dict)):
+        palette = []
+        for entry in value:
+            palette.append(indexed_color(entry) if isinstance(entry, dict) else rgb_color(entry))
+        return tuple(palette)
+    if not isinstance(value, list) or len(value) != 3:
         raise ValueError(f"Text color '{name}' must be an RGB list or an object with an 'index' value.")
 
-    if (not isinstance(value, (list, tuple)) or len(value) != 3 or any(not isinstance(channel, int) or isinstance(channel, bool) or not 0 <= channel <= 255 for channel in value)):
-        raise ValueError(f"Text color '{name}' must contain three RGB values from 0 to 255.")
-    return tuple(value)
+    return rgb_color(value)
 
 
 def add_color(image, color):
@@ -78,7 +83,10 @@ def load_icon(markup, color, icon_height):
     try:
         icon = Image.open(icon_path).convert("RGBA")
     except FileNotFoundError:
-        icon = Image.open(GENERAL_ASSETS_DIR / "sigils" / "X.png").convert("RGBA")
+        fallback_path = GENERAL_ASSETS_DIR / "sigils" / "X_outline.png"
+        if not fallback_path.exists():
+            fallback_path = GENERAL_ASSETS_DIR / "sigils" / "X.png"
+        icon = Image.open(fallback_path).convert("RGBA")
 
     icon_width = max(1, round(icon.width * icon_height / icon.height))
     icon = icon.resize((icon_width, icon_height))

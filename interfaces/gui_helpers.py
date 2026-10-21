@@ -11,7 +11,19 @@ from PySide6.QtWidgets import (
     QWidget
 )
 
+from model.cards import create_card
+
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def create_card_preview(card_name="", art_file="", temple="", tier="", cost="", power="", health="",
+    sigils="", token="", traits="", tribes="", flavor_text="", credit="", tags="", config=None):
+    """Create a card image from renderer fields, defaulting unspecified values to empty."""
+    card_data = {
+        "Card Name": card_name, "Art File": art_file, "Temple": temple, "Tier": tier, "Cost": cost, "Power": power, "Health": health,
+        "Sigils": sigils, "Token": token, "Traits": traits, "Tribes": tribes, "Flavor Text": flavor_text, "Credit": credit, "Tags": tags
+    }
+    return create_card(card_data, config)
 
 
 def _split(value):

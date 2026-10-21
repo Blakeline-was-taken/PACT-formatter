@@ -94,11 +94,7 @@ class EditorWindow(QMainWindow):
         ("Overview", WelcomePage),
         ("Card Editor", None),
         ("Sigil/Trait Editor", None),
-        ("Template Editor", lambda: EditorPage(
-            "Template Editor",
-            "Tweak positioning and assets for all the different card templates.",
-            "Temple and tier layout controls will appear here.",
-        )),
+        ("Template Editor", None),
         ("Config Editor", lambda: EditorPage(
             "Config Editor",
             "Edit global formatter options and printing formats.",
@@ -129,6 +125,7 @@ class EditorWindow(QMainWindow):
     def _build_tabs(self):
         from .card_editor import CardEditor
         from .sigil_trait_editor import SigilTraitEditor
+        from .template_editor import TemplateEditor
 
         self.tabs = QTabWidget()
         self.tabs.setDocumentMode(True)
@@ -138,7 +135,11 @@ class EditorWindow(QMainWindow):
 
         for name, page_factory in self.TAB_DEFINITIONS:
             if page_factory is None:
-                page_factory = CardEditor if name == "Card Editor" else SigilTraitEditor
+                page_factory = {
+                    "Card Editor": CardEditor,
+                    "Sigil/Trait Editor": SigilTraitEditor,
+                    "Template Editor": TemplateEditor,
+                }[name]
             self.tabs.addTab(page_factory(), name)
 
     def _tab_changed(self, index):
@@ -167,6 +168,34 @@ def _apply_style(app):
         }
         QLineEdit, QComboBox, QSpinBox, QPushButton {
             min-height: 28px;
+        }
+        QLineEdit, QComboBox {
+            background: #ffffff; border: 1px solid #b8c4d4;
+            border-radius: 4px; padding: 4px 8px; color: #202938;
+        }
+        QComboBox::drop-down { border-left: 1px solid #d5dce6; width: 24px; }
+        QComboBox QAbstractItemView {
+            background: #ffffff; color: #202938; selection-background-color: #dce9fa;
+            selection-color: #17365d; border: 1px solid #b8c4d4;
+        }
+        QCheckBox { spacing: 8px; color: #202938; }
+        QCheckBox::indicator {
+            width: 18px; height: 18px; border: 1px solid #8b9bb0;
+            border-radius: 4px; background: #ffffff;
+        }
+        QCheckBox::indicator:hover { border-color: #3978c5; background: #eef5ff; }
+        QCheckBox::indicator:checked { border-color: #2868b2; background: #3978c5; }
+        QCheckBox::indicator:checked:hover { background: #2868b2; }
+        #templateSectionButton, #templateSubsectionButton {
+            background: #ffffff; border: 1px solid #cbd5e1; border-radius: 5px;
+            color: #334155; padding: 7px 10px; text-align: left;
+        }
+        #templateSectionButton { font-weight: 600; }
+        #templateSectionButton:hover, #templateSubsectionButton:hover {
+            background: #edf4fd; border-color: #8eafd6;
+        }
+        #templateSectionButton:checked, #templateSubsectionButton:checked {
+            background: #dce9fa; border-color: #3978c5; color: #17365d;
         }
         #pageTitle { font-size: 26px; font-weight: 600; }
         #pageDescription { color: #586579; font-size: 13px; }

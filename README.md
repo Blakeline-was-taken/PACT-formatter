@@ -208,14 +208,14 @@ Inline formatting is available in rendered text fields: card names, flavor text,
 * `{color:ColorName}text{/color}` applies a configured color to the enclosed text. Color names are case-insensitive, and color spans can be nested.
 * `\n` starts a new line.
 
-Define named colors in `text_colors` in `config.json`. A color can be an RGB list, a 1-based index into the active temple/tier/background `colors.png` palette, or a list of RGB colors. A color list cycles through its colors for each non-whitespace character in the span:
+Define named colors in `text_colors` in `config.json`. A color can be an RGB list, a 1-based index into the active temple/tier/background `colors.png` palette, or a palette of RGB colors. A palette cycles through its colors for each non-whitespace character in the span and can contain RGB colors, palette indexes, or a mix of both.
 
 ```json
 "text_colors": {
   "dark": { "index": 7 },
   "red": [255, 0, 0],
   "gems": [[77, 125, 21], [143, 69, 23], [16, 102, 104]],
-  "rainbow": [[182, 20, 20], [218, 102, 39], [204, 157, 25]]
+  "example": [[182, 20, 20], {"index": 6}, [204, 157, 25]]
 }
 ```
 

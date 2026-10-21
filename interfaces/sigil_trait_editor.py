@@ -19,8 +19,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from model import DEFAULT_CONFIG, cards, sigils
-from .gui_helpers import Gemification, NoWheelComboBox, ROOT, _split, _join
+from model import DEFAULT_CONFIG, sigils
+from .gui_helpers import Gemification, NoWheelComboBox, ROOT, _split, _join, create_card_preview
 
 SIGIL_PATH = ROOT / DEFAULT_CONFIG["sigils_file_path"]
 TRAIT_PATH = ROOT / DEFAULT_CONFIG["traits_file_path"]
@@ -361,23 +361,7 @@ class SigilTraitEditor(QWidget):
             card_tags = f"{current_name}_left_symbol, {current_name}_right_symbol"
             if "mox_" in current_tags:
                 card_tags += ", mox_indicator"
-            preview_row = {
-                "Card Name": "",
-                "Art File": "",
-                "Temple": "",
-                "Tier": "",
-                "Power": "",
-                "Health": "",
-                "Cost": "",
-                "Sigils": row["Sigils"],
-                "Token": "",
-                "Traits": row["Traits"],
-                "Tribes": "",
-                "Flavor Text": "",
-                "Credit": "",
-                "Tags": card_tags,
-            }
-            image = cards.create_card(preview_row)
+            image = create_card_preview(sigils=row["Sigils"], traits=row["Traits"], tags=card_tags)
             pixmap = self._pixmap_for(image)
             self.preview.setPixmap(pixmap)
         except Exception as error:
