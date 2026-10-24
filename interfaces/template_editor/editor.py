@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
 )
 
 from model import DEFAULT_CONFIG, sigils
-from ..gui_helpers import NoWheelComboBox, ROOT, create_card_preview
+from ..gui_helpers import ColorPickerButton, NoWheelComboBox, NoWheelSpinBox, ROOT, create_card_preview
 from .data import (
     COORDINATE_FIELDS,
     SUBSECTION_FIELDS,
@@ -358,11 +358,11 @@ class TemplateEditor(QWidget):
         type_selector.setCurrentText(entry_type)
         layout.addWidget(type_selector)
 
-        index = QSpinBox()
+        index = NoWheelSpinBox()
         index.setRange(1, 1_000_000)
-        red = QSpinBox()
-        green = QSpinBox()
-        blue = QSpinBox()
+        red = NoWheelSpinBox()
+        green = NoWheelSpinBox()
+        blue = NoWheelSpinBox()
         for control in (red, green, blue):
             control.setRange(0, 255)
         rgb_widget = QWidget()
@@ -379,6 +379,8 @@ class TemplateEditor(QWidget):
             channel_layout.addWidget(channel_label)
             channel_layout.addWidget(control)
             rgb_layout.addWidget(channel)
+        picker = ColorPickerButton((0, 0, 0), "Pick")
+        rgb_layout.addWidget(picker)
         layout.addWidget(index)
         layout.addWidget(rgb_widget, 1)
 
@@ -391,6 +393,7 @@ class TemplateEditor(QWidget):
             "index": index,
             "rgb_widget": rgb_widget,
             "rgb": (red, green, blue),
+            "picker": picker,
             "remove": remove,
         }
         self._color_entries.append(record)
@@ -411,9 +414,24 @@ class TemplateEditor(QWidget):
         type_selector.currentTextChanged.connect(lambda selected, color_record=record: self._update_color_entry_type(color_record, selected))
         index.valueChanged.connect(self._color_editor_changed)
         for control in (red, green, blue):
+            control.valueChanged.connect(lambda *_args, color_record=record: self._sync_color_picker(color_record))
             control.valueChanged.connect(self._color_editor_changed)
+        picker.colorPicked.connect(lambda color, color_record=record: self._set_color_entry_rgb(color_record, color))
+        picker.colorPreviewed.connect(lambda color, color_record=record: self._set_color_entry_rgb(color_record, color))
         self._update_color_entry_type(record, entry_type)
+        self._sync_color_picker(record)
         self._update_color_entry_buttons()
+        self._color_editor_changed()
+
+    def _sync_color_picker(self, record):
+        """Keep the RGB swatch synchronized with the editable channel values."""
+        record["picker"].set_color(tuple(control.value() for control in record["rgb"]))
+
+    def _set_color_entry_rgb(self, record, color):
+        """Apply a chosen RGB color to the channel controls and config value."""
+        for control, channel in zip(record["rgb"], color):
+            control.setValue(channel)
+        self._sync_color_picker(record)
         self._color_editor_changed()
 
     def _update_color_entry_type(self, record, entry_type):
@@ -840,8 +858,8 @@ class TemplateEditor(QWidget):
             sample_sigil = {
                 "Cell": "CELL_Template, Template",
                 "Latch": "LATCH_Template, Template",
-                "Arcane": "RAINBOW, Template",
-                "Tribal": "TRIBAL, Template",
+                "Arcane": "Template, RAINBOW, Template",
+                "Tribal": "Template, TRIBAL, Template",
                 "Hint": "HINT_Template",
             }[subsection]
         elif section == "Rich Text Colors" and self._editing_color_key:

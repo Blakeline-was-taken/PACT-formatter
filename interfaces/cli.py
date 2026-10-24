@@ -204,23 +204,6 @@ try:
                 sigil_patch = cards.paste_sigil(sigil_patch, sigil_img, sigil_box)
                 save_image(sigil_patch, "exports/sigil patches/" + sigil.name + "_patch.png")
 
-            if DEFAULT_CONFIG["export_sigil_description_icon"]:
-                icon = sigils.get_resized_image(
-                    sigil.sigilImage(color=color),
-                    get_inline_icon_size(sigil.get_description(), ImageFont.truetype(FONT, DEFAULT_CONFIG["sigil_description_font_size"]))
-                )
-                save_image(icon, "exports/sigil icons/" + sigil.name + "_icon.png")
-
-            if DEFAULT_CONFIG["export_trait_description_icon"]:
-                icon = sigils.get_resized_image(
-                    sigil.sigilImage(color=color),
-                    get_inline_icon_size(
-                        sigil.get_description(),
-                        ImageFont.truetype(FONT, DEFAULT_CONFIG["trait_description_font_size"])
-                    )
-                )
-                save_image(icon, "exports/sigil icons/" + sigil.name + "_trait-icon.png")
-
 
         export_data(sigils_csv_data, data_arrays, export_sigil)
     else:

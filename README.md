@@ -87,7 +87,7 @@ If they have color in them, then in order to have them probably be recolored whe
 
 ## 2. Running the Generator
 
-The formatter now opens the editor GUI by default:
+The formatter opens the GUI editor by default:
 
 1. **Launch the Main Script:** Open a terminal in the root directory of the project and run the main entry point:
 
@@ -95,9 +95,13 @@ The formatter now opens the editor GUI by default:
 python main.py
 ```
 
-The initial GUI provides tabs for cards, sigils and traits, templates and layouts, assets, configuration, and exports. These tabs are the foundation for the editors being added in later iterations.
+The GUI provides :
+1. A Card Editor, letting you create new cards and edit existing ones. You can also export them individually there.
+2. A Sigil/Trait Editor, letting you create new sigils/traits and edit existing ones. You can also export them individually there.
+3. A Template Editor, which lets you edit the template itself and its config options. This can be for all cards, or for specific kinds of cards under certain temples, tiers and background modifiers. See more in The Configuration Blueprint.
+4. An Export Panel, which lets you filter and export multiple cards, sigils, or traits in bulk. This is the preferred way of exporting.
 
-The GUI shell, editors, and legacy CLI are grouped in the `interfaces/` package. The Card Editor lives in `interfaces/card_editor/`, the Sigil/Trait Editor lives in `interfaces/sigil_trait_editor/` and the Template Editor lives in `interfaces/template_editor/`. The project root has `main.py` as the single application entry point, while renderer and core data-model code are in `model/`.
+The shell, editors, and legacy CLI are grouped in the `interfaces/` package. The project root has `main.py` as the single application entry point, while renderer and core data-model code are in `model/`.
 
 The legacy command-line exporter remains available:
 
@@ -122,7 +126,7 @@ When using the CLI, select the asset type when prompted:
 
 ## 3. Finding Exports
 
-Once the progress bar completes, all rendered images are compiled inside an `exports/` directory. Depending on the configurations in `config.json`, they will look like this:
+Once the progress bar completes, all rendered images are compiled inside an `exports/` directory.
 
 ### Cards (`exports/cards/`)
 
@@ -303,7 +307,7 @@ The formatter contains three separate rendering formats to ensure content fits c
 * **`export_sorted_by_folder`**: Automates output organization, sorting generated cards into subdirectories named after their respective temples.
 * **`export_color`**: An RGB list (e.g., `[0, 0, 0]`) setting the sigils to a certain color.
 * **`export_normal_formatting` / `export_shorter_formatting` / `export_base_game_formatting`**: Standard output filters directing which sigil variants are to be printed.
-* **`export_sigil_patches` / `export_sigil_description_icon` / `export_trait_description_icon` / `exported_traitline`**: Exports variants of the sigil icons.
+* **`export_sigil_patches` / `exported_traitline`**: Exports variants of the sigil icons.
 
 ### Typography, Color Routing & Scale
 

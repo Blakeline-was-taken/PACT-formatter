@@ -196,13 +196,13 @@
                 "latch_sigil_small_max_height": 150,
                 "latch_sigil_medium_max_height": 200,
 
-                "arcane_sigil_top_displacement": 10,
-                "arcane_sigil_bottom_displacement": 95,
+                "arcane_sigil_top_displacement": -10,
+                "arcane_sigil_bottom_displacement": -95,
                 "arcane_text": "If you provide 2 mox colors:",
                 "arcane_text_y": 20,
 
-                "tribal_sigil_top_displacement": 20,
-                "tribal_sigil_bottom_displacement": 95,
+                "tribal_sigil_top_displacement": -20,
+                "tribal_sigil_bottom_displacement": -95,
                 "tribal_text": "If this card shares a tribe with another:",
                 "tribal_text_y": 30,
 

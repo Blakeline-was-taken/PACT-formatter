@@ -3,11 +3,15 @@
 from pathlib import Path
 
 from PySide6.QtCore import Signal
+from PySide6.QtGui import QColor, QIcon, QPixmap
 from PySide6.QtWidgets import (
+    QColorDialog,
     QComboBox,
+    QDialog,
     QHBoxLayout,
     QLineEdit,
     QPushButton,
+    QSpinBox,
     QWidget,
 )
 
@@ -75,6 +79,66 @@ class NoWheelComboBox(QComboBox):
     def wheelEvent(self, event):
         """Leave wheel scrolling to the enclosing scroll area."""
         event.ignore()
+
+
+class NoWheelSpinBox(QSpinBox):
+    """Numeric selector that leaves wheel scrolling to the parent widget."""
+
+    def wheelEvent(self, event):
+        """Leave wheel scrolling to the enclosing scroll area."""
+        event.ignore()
+
+
+class ColorPickerButton(QPushButton):
+    """RGB color chooser button with a live swatch and shared dialog behavior."""
+
+    colorPicked = Signal(object)
+    colorPreviewed = Signal(object)
+
+    def __init__(self, color=(0, 0, 0), label="Color", parent=None):
+        super().__init__(parent)
+        self.label = label
+        self._color = (0, 0, 0)
+        self.clicked.connect(self._choose_color)
+        self.set_color(color)
+
+    @property
+    def color(self):
+        """Return the selected RGB channels."""
+        return self._color
+
+    def set_color(self, color):
+        """Set an RGB tuple and refresh the button label and icon swatch."""
+        self._color = tuple(color)
+        selected = QColor(*self._color)
+        self.setText(f"{self.label}: {selected.name()}")
+        swatch = QPixmap(14, 14)
+        swatch.fill(selected)
+        self.setIcon(QIcon(swatch))
+        self.setStyleSheet("")
+
+    def _choose_color(self):
+        initial_color = self._color
+        dialog_color = (255, 255, 255) if initial_color == (0, 0, 0) else initial_color
+        dialog = QColorDialog(QColor(*dialog_color), self)
+        dialog.setOption(QColorDialog.DontUseNativeDialog, True)
+        dialog.setWindowTitle("Choose color")
+        dialog.currentColorChanged.connect(self._preview_color)
+        if dialog.exec() != QDialog.Accepted:
+            self.set_color(initial_color)
+            self.colorPreviewed.emit(initial_color)
+            return
+        selected = dialog.selectedColor()
+        if selected.isValid():
+            color = (selected.red(), selected.green(), selected.blue())
+            self.set_color(color)
+            self.colorPreviewed.emit(color)
+            self.colorPicked.emit(color)
+
+    def _preview_color(self, selected):
+        color = (selected.red(), selected.green(), selected.blue())
+        self.set_color(color)
+        self.colorPreviewed.emit(color)
 
 
 class Gemification(QWidget):

@@ -15,42 +15,6 @@ from PySide6.QtWidgets import (
 )
 
 
-class EditorPage(QWidget):
-    """Base page with a consistent heading, description, and empty-state panel."""
-
-    def __init__(self, title, description, next_step):
-        """Build a reusable page with a heading and workspace status panel."""
-        super().__init__()
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(32, 28, 32, 28)
-        layout.setSpacing(16)
-
-        heading = QLabel(title)
-        heading.setObjectName("pageTitle")
-        layout.addWidget(heading)
-
-        summary = QLabel(description)
-        summary.setObjectName("pageDescription")
-        summary.setWordWrap(True)
-        layout.addWidget(summary)
-
-        panel = QGroupBox("Workspace")
-        panel_layout = QVBoxLayout(panel)
-        panel_layout.setContentsMargins(24, 24, 24, 24)
-        panel_layout.setSpacing(10)
-
-        status = QLabel(next_step)
-        status.setObjectName("emptyState")
-        status.setWordWrap(True)
-        panel_layout.addWidget(status)
-
-        hint = QLabel("This area is ready for the editor controls.")
-        hint.setObjectName("mutedText")
-        panel_layout.addWidget(hint)
-        panel_layout.addStretch()
-        layout.addWidget(panel, 1)
-
-
 class WelcomePage(QWidget):
     """Show a short overview of the available editor tabs."""
 
@@ -77,9 +41,8 @@ class WelcomePage(QWidget):
         for text in (
             "Card Editor - Change, Preview and Export individual cards with live updates",
             "Sigil & Trait Editor - Change, Preview and Export sigils and traits with live updates",
-            "Template Editor - Tweak positioning and assets for all the different card templates",
-            "Config Editor - Edit global formatter options and printing formats",
-            "Export - Render cards, sigils, and traits in bulk",
+            "Template Editor - Edit formatter options and printing formats for all the different card templates",
+            "Export Panel - Render cards, sigils, and traits in bulk",
         ):
             label = QLabel(text)
             label.setObjectName("overviewItem")
@@ -96,16 +59,7 @@ class EditorWindow(QMainWindow):
         ("Card Editor", None),
         ("Sigil/Trait Editor", None),
         ("Template Editor", None),
-        ("Config Editor", lambda: EditorPage(
-            "Config Editor",
-            "Edit global formatter options and printing formats.",
-            "Configuration fields and save actions will appear here.",
-        )),
-        ("Export", lambda: EditorPage(
-            "Export",
-            "Render cards, sigils, and traits in bulk using the current settings.",
-            "Export selection, progress, and output controls will appear here.",
-        )),
+        ("Export Panel", None),
     )
 
     def __init__(self):
@@ -128,6 +82,7 @@ class EditorWindow(QMainWindow):
     def _build_tabs(self):
         """Create each editor page and install it in the central tab widget."""
         from .card_editor import CardEditor
+        from .export_panel import ExportPanel
         from .sigil_trait_editor import SigilTraitEditor
         from .template_editor import TemplateEditor
 
@@ -143,6 +98,7 @@ class EditorWindow(QMainWindow):
                     "Card Editor": CardEditor,
                     "Sigil/Trait Editor": SigilTraitEditor,
                     "Template Editor": TemplateEditor,
+                    "Export Panel": ExportPanel,
                 }[name]
             self.tabs.addTab(page_factory(), name)
 
@@ -195,6 +151,12 @@ def _apply_style(app):
         QCheckBox::indicator:hover { border-color: #3978c5; background: #eef5ff; }
         QCheckBox::indicator:checked { border-color: #2868b2; background: #3978c5; }
         QCheckBox::indicator:checked:hover { background: #2868b2; }
+        QPushButton#primaryButton {
+            background: #3978c5; border: 1px solid #2868b2; border-radius: 4px;
+            color: #ffffff; font-weight: 600; padding: 6px 10px;
+        }
+        QPushButton#primaryButton:hover { background: #2868b2; }
+        QPushButton#primaryButton:disabled { background: #a8bad0; border-color: #a8bad0; }
 
         /* Expandable template section navigation */
         #templateSectionButton, #templateSubsectionButton {
