@@ -1,9 +1,10 @@
 """Card CSV access and shared card-editor data definitions."""
 
 import csv
+from pathlib import Path
 
 from model import DEFAULT_CONFIG
-from ..gui_helpers import ROOT, _join, _split
+from ..gui_helpers import ROOT, _join, _split, safe_filename
 
 CARDS_PATH = ROOT / DEFAULT_CONFIG["cards_file_path"]
 ASSET_PATH = ROOT / DEFAULT_CONFIG["assets_dir"] / "general_assets" / "card_art"
@@ -63,6 +64,40 @@ def format_card_tags(background, selected_tags, left_symbol, right_symbol, extra
     if extra_cells > 0:
         tags.append(f"{extra_cells}_extra_cell")
     return _join(tags)
+
+
+def card_export_filenames(rows, sorted_by_folder):
+    """Allocate consistent card-art filenames without collisions per folder."""
+    used_by_folder = {}
+    filenames = []
+    for row in rows:
+        art_file = row.get("Art File") or ""
+        if not art_file:
+            art_file = f"{row.get('Card Name') or 'export'}.png"
+        art_file = art_file.replace("\\", "/").rsplit("/", 1)[-1]
+        filename = safe_filename(art_file)
+        if sorted_by_folder:
+            folder = (safe_filename(row.get("Temple", "")).casefold(), safe_filename(row.get("Tier", "")).casefold())
+        else:
+            folder = ()
+        used = used_by_folder.setdefault(folder, set())
+        candidate = filename
+        suffix_number = 1
+        while candidate.casefold() in used:
+            suffix_number += 1
+            path = Path(filename)
+            candidate = f"{path.stem}_{suffix_number}{path.suffix}"
+        used.add(candidate.casefold())
+        filenames.append(candidate)
+    return filenames
+
+
+def card_export_path(row, filename, output_dir, sorted_by_folder):
+    """Build the destination path shared by individual and bulk card exports."""
+    destination = Path(output_dir) / "cards"
+    if sorted_by_folder:
+        destination = destination / safe_filename(row.get("Temple", "")) / safe_filename(row.get("Tier", ""))
+    return destination / filename
 
 
 class CardRepository:

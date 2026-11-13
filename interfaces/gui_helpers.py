@@ -1,9 +1,10 @@
 """Shared widgets and value helpers used by GUI editor pages."""
 
+import re
 from pathlib import Path
 
-from PySide6.QtCore import Signal
-from PySide6.QtGui import QColor, QIcon, QPixmap
+from PySide6.QtCore import QUrl, Signal
+from PySide6.QtGui import QColor, QDesktopServices, QIcon, QPixmap
 from PySide6.QtWidgets import (
     QColorDialog,
     QComboBox,
@@ -18,6 +19,17 @@ from PySide6.QtWidgets import (
 from model.cards import create_card
 
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def safe_filename(value, fallback="export"):
+    """Replace characters that are invalid in Windows filenames."""
+    safe = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", str(value or "")).strip(" .")
+    return safe or fallback
+
+
+def open_folder(path):
+    """Open a local folder in the operating system's file browser."""
+    return QDesktopServices.openUrl(QUrl.fromLocalFile(str(Path(path).resolve())))
 
 
 def create_card_preview(

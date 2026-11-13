@@ -34,6 +34,8 @@ from .data import (
     CARDS_PATH,
     TAG_OPTIONS,
     CardRepository,
+    card_export_filenames,
+    card_export_path,
     format_card_tags,
     parse_card_tags,
 )
@@ -387,7 +389,7 @@ class CardEditor(QWidget):
                 self.fields[name + " gem"].set_gems(gems)
                 self.fields[name + " gem"].effect.setText(effect)
             else:
-                self.fields[name].setText(raw or "0")
+                self.fields[name].setText(raw or ("1" if name == "Health" else "0"))
                 self.fields[name + " toggle"].setChecked(False)
         # Restore ordered fields through their own parsers and row widgets.
         self.costs.set_values(row.get("Cost", "").split(" + ") if row.get("Cost") else [])
@@ -487,7 +489,9 @@ class CardEditor(QWidget):
             return
         self.current_index = -1
         self.original = {}
-        self._populate({field: "" for field in CARD_FIELDS})
+        new_row = {field: "" for field in CARD_FIELDS}
+        new_row["Health"] = "1"
+        self._populate(new_row)
         self.art.setText("")
         self._refresh_search("")
         self._render_preview()
@@ -539,7 +543,8 @@ class CardEditor(QWidget):
         if export:
             try:
                 image = cards.create_card(row)
-                target = ROOT / "exports" / "cards" / row["Temple"] / row["Tier"] / f"{row['Card Name']}.png"
+                filenames = card_export_filenames(self.rows, sorted_by_folder=True)
+                target = card_export_path(row, filenames[self.current_index], ROOT / "exports", sorted_by_folder=True)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 image.save(target)
             except Exception as error:

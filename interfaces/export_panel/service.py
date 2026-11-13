@@ -1,7 +1,6 @@
 """Parallel image rendering and file output for the export panel."""
 
 import os
-import re
 import tempfile
 import threading
 import traceback
@@ -12,7 +11,8 @@ from PIL import Image
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Slot
 
 from model import DEFAULT_CONFIG, GENERAL_ASSETS_DIR, cards, sigils
-from model.text import strip_rich_text_tags
+from ..card_editor.data import card_export_filenames, card_export_path
+from ..gui_helpers import safe_filename
 
 _COLOR_MAP_LOCK = threading.Lock()
 _DEFAULT_COLOR_MAP = None
@@ -56,8 +56,7 @@ def _detach_task_log_handler(handler):
 
 
 def _safe_name(name):
-    safe = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", name).strip(" .")
-    return safe or "export"
+    return safe_filename(name)
 
 
 def _default_color_map():
@@ -115,15 +114,11 @@ def _save_image(image, destination):
     return destination
 
 
-def _export_card(row, options, output_dir):
+def _export_card(row, options, output_dir, filename=None):
     _validate_card_effects(row)
     image = cards.create_card(row)
-    name = strip_rich_text_tags(row.get("Card Name", row.get("Name", ""))).strip()
-    filename = _safe_name(Path(row.get("Art File") or f"{name}.png").name)
-    if options["sorted"]:
-        destination = output_dir / "cards" / _safe_name(row.get("Temple", "")) / _safe_name(row.get("Tier", "")) / filename
-    else:
-        destination = output_dir / "cards" / filename
+    filename = filename or card_export_filenames([row], options["sorted"])[0]
+    destination = card_export_path(row, filename, output_dir, options["sorted"])
     _save_image(image, destination)
     return [destination]
 
@@ -170,9 +165,9 @@ def _export_trait(row, options, output_dir):
     return [destination]
 
 
-def _export_row(row, item_type, options, output_dir):
+def _export_row(row, item_type, options, output_dir, card_filename=None):
     if item_type == "Cards":
-        return _export_card(row, options, output_dir)
+        return _export_card(row, options, output_dir, card_filename)
     elif item_type == "Sigils":
         return _export_sigil(row, options, output_dir)
     elif item_type == "Traits":
@@ -186,12 +181,13 @@ class _TaskSignals(QObject):
 
 
 class _ExportTask(QRunnable):
-    def __init__(self, row, item_type, options, output_dir):
+    def __init__(self, row, item_type, options, output_dir, card_filename=None):
         super().__init__()
         self.row = row
         self.item_type = item_type
         self.options = options
         self.output_dir = output_dir
+        self.card_filename = card_filename
         self.signals = _TaskSignals()
 
     @Slot()
@@ -210,7 +206,13 @@ class _ExportTask(QRunnable):
         log_handler = _TaskLogHandler(threading.get_ident(), item_name, collect_log)
         _attach_task_log_handler(log_handler)
         try:
-            output_paths = _export_row(self.row, self.item_type, self.options, self.output_dir)
+            output_paths = _export_row(
+                self.row,
+                self.item_type,
+                self.options,
+                self.output_dir,
+                self.card_filename,
+            )
             for output_path in output_paths:
                 if not output_path.is_file() or output_path.stat().st_size == 0:
                     raise OSError(f"Export output was not created: {output_path}")
@@ -242,6 +244,11 @@ class ExportJob(QObject):
         self.pool = QThreadPool(self)
         self.pool.setMaxThreadCount(max(1, os.cpu_count() or 1))
         self.total = len(self.rows)
+        all_card_rows = self.options.get("all_card_rows", self.rows)
+        self.card_filenames = {}
+        if item_type == "Cards":
+            filenames = card_export_filenames(all_card_rows, self.options.get("sorted", False))
+            self.card_filenames = {id(row): filename for row, filename in zip(all_card_rows, filenames)}
         self.completed = 0
         self.succeeded = 0
         self.failed = 0
@@ -256,7 +263,13 @@ class ExportJob(QObject):
             self.finished.emit(0, 0, 0, "", "")
             return
         for row in self.rows:
-            task = _ExportTask(row, self.item_type, self.options, self.output_dir)
+            task = _ExportTask(
+                row,
+                self.item_type,
+                self.options,
+                self.output_dir,
+                self.card_filenames.get(id(row)),
+            )
             task.signals.completed.connect(self._item_completed)
             task.signals.message.connect(self.message)
             self._tasks.append(task)

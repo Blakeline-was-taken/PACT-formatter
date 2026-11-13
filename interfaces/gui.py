@@ -2,64 +2,22 @@
 
 import sys
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QFont
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QApplication,
-    QGroupBox,
-    QLabel,
     QMainWindow,
     QTabWidget,
-    QVBoxLayout,
-    QWidget,
 )
-
-
-class WelcomePage(QWidget):
-    """Show a short overview of the available editor tabs."""
-
-    def __init__(self):
-        """Build the welcome page's title, introduction, and editor list."""
-        super().__init__()
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(32, 28, 32, 28)
-        layout.setSpacing(16)
-
-        title = QLabel("PACT formatter")
-        title.setObjectName("pageTitle")
-        layout.addWidget(title)
-
-        description = QLabel("Use the tabs above to edit card data, configure layouts, manage assets, and prepare exports.")
-        description.setObjectName("pageDescription")
-        description.setWordWrap(True)
-        layout.addWidget(description)
-
-        overview = QGroupBox("Editor workspace")
-        overview_layout = QVBoxLayout(overview)
-        overview_layout.setContentsMargins(24, 24, 24, 24)
-        overview_layout.setSpacing(12)
-        for text in (
-            "Card Editor - Change, Preview and Export individual cards with live updates",
-            "Sigil & Trait Editor - Change, Preview and Export sigils and traits with live updates",
-            "Template Editor - Edit formatter options and printing formats for all the different card templates",
-            "Export Panel - Render cards, sigils, and traits in bulk",
-        ):
-            label = QLabel(text)
-            label.setObjectName("overviewItem")
-            overview_layout.addWidget(label)
-        layout.addWidget(overview)
-        layout.addStretch()
 
 
 class EditorWindow(QMainWindow):
     """Own the main window, editor tabs, and application-level actions."""
 
     TAB_DEFINITIONS = (
-        ("Overview", WelcomePage),
+        ("Export Panel", None),
         ("Card Editor", None),
         ("Sigil/Trait Editor", None),
         ("Template Editor", None),
-        ("Export Panel", None),
     )
 
     def __init__(self):
@@ -68,16 +26,8 @@ class EditorWindow(QMainWindow):
         self.setWindowTitle("PACT Formatter")
         self.setMinimumSize(960, 640)
         self.resize(1180, 760)
-        self._build_actions()
         self._build_tabs()
         self.statusBar().showMessage("Ready")
-
-    def _build_actions(self):
-        """Add application-wide actions to the menu bar."""
-        close_action = QAction("Close", self)
-        close_action.setShortcut("Ctrl+Q")
-        close_action.triggered.connect(self.close)
-        self.menuBar().addMenu("File").addAction(close_action)
 
     def _build_tabs(self):
         """Create each editor page and install it in the central tab widget."""
@@ -89,18 +39,20 @@ class EditorWindow(QMainWindow):
         self.tabs = QTabWidget()
         self.tabs.setDocumentMode(True)
         self.tabs.setMovable(False)
+        self.tabs.tabBar().setExpanding(True)
         self.tabs.currentChanged.connect(self._tab_changed)
         self.setCentralWidget(self.tabs)
 
         for name, page_factory in self.TAB_DEFINITIONS:
             if page_factory is None:
                 page_factory = {
+                    "Export Panel": ExportPanel,
                     "Card Editor": CardEditor,
                     "Sigil/Trait Editor": SigilTraitEditor,
                     "Template Editor": TemplateEditor,
-                    "Export Panel": ExportPanel,
                 }[name]
             self.tabs.addTab(page_factory(), name)
+        self.tabs.setCurrentIndex(0)
 
     def _tab_changed(self, index):
         """Reflect the active tab in the window status bar."""
@@ -114,9 +66,8 @@ def _apply_style(app):
     app.setFont(QFont("Segoe UI", 10))
     app.setStyleSheet(
         """
-        /* Window surfaces, menus, and tab navigation */
+        /* Window surfaces and tab navigation */
         QMainWindow, QWidget { background: #f5f7fb; color: #202938; }
-        QMenuBar, QMenu { background: #ffffff; color: #202938; }
         QTabWidget::pane { border: 1px solid #dce2ec; background: #ffffff; }
         QTabWidget::tab-bar { alignment: left; }
         QTabBar::tab {
@@ -181,7 +132,7 @@ def _apply_style(app):
         }
         QGroupBox::title { subcontrol-origin: margin; left: 16px; padding: 0 6px; }
         #emptyState { color: #334155; font-size: 16px; }
-        #mutedText, #overviewItem { color: #68758a; }
+        #mutedText { color: #68758a; }
         QStatusBar { background: #edf1f7; color: #586579; }
         """
     )

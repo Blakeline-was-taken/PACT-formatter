@@ -130,10 +130,10 @@ Once the progress bar completes, all rendered images are compiled inside an `exp
 
 ### Cards (`exports/cards/`)
 
-Cards can either be exported flat into one folder or perfectly sorted based on the configuration rules:
+Card exports use the card art filename (the `Art File` column). If multiple cards would use the same filename in the same folder, subsequent exports receive `_2`, `_3`, and so on before the extension. Cards can either be exported flat into one folder or sorted into Temple/Tier subfolders:
 
-* **Sorted (Default)**: `exports/cards/[Temple]/[Tier]/[Card_Name].png` (e.g., `exports/cards/Beast/Common/Bullfrog.png`)
-* **Flat**: `exports/cards/[Card_Name].png`
+* **Sorted (Default)**: `exports/cards/[Temple]/[Tier]/[Art_File]` (e.g., `exports/cards/Beast/Common/Bullfrog.png`)
+* **Flat**: `exports/cards/[Art_File]`
 
 ### Sigils (`exports/sigils/`)
 

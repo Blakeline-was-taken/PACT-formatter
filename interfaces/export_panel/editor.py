@@ -3,12 +3,12 @@
 import csv
 from pathlib import Path
 
-from PySide6.QtCore import QSize, Qt, QTimer
+from PySide6.QtCore import QSize, QSettings, Qt, QTimer
 from PySide6.QtWidgets import (
-    QCheckBox,
     QComboBox,
     QCompleter,
     QAbstractItemView,
+    QCheckBox,
     QFileDialog,
     QFormLayout,
     QGridLayout,
@@ -28,7 +28,7 @@ from PySide6.QtWidgets import (
 
 from model import sigils
 from ..card_editor.data import CARDS_PATH, parse_card_tags
-from ..gui_helpers import ColorPickerButton, NoWheelComboBox, ROOT
+from ..gui_helpers import ColorPickerButton, NoWheelComboBox, ROOT, open_folder
 from ..sigil_trait_editor.data import SIGIL_PATH, TRAIT_PATH
 from .data import (
     COST_FILTERS,
@@ -77,6 +77,12 @@ class ExportPanel(QWidget):
             name = _display_name(row.get("Name", "")).casefold()
             self.effect_tags_by_name.setdefault(name, set()).update(tag.strip().casefold() for tag in row.get("Tags", "").split(",") if tag.strip())
         self.item_type = "Cards"
+        self.settings = QSettings("Blakeline-was-taken", "PACT Formatter")
+        default_output_dir = str(ROOT / "exports")
+        self.output_dirs = {
+            item_type: str(self.settings.value(f"exportDirectories/{item_type}", default_output_dir))
+            for item_type in EXPORT_TYPES
+        }
         self.selected = {}
         self.selected_list_items = {}
         self.visible_rows = []
@@ -127,12 +133,13 @@ class ExportPanel(QWidget):
         self.options_layout.setContentsMargins(0, 0, 0, 0)
         header_layout.addRow("Options", self.options_widget)
         output_row = QHBoxLayout()
-        self.output_edit = QLineEdit(str(ROOT / "exports"))
+        self.output_edit = QLineEdit(self.output_dirs[self.item_type])
         self.output_edit.setReadOnly(True)
         browse = QPushButton("Choose folder...")
         browse.clicked.connect(self._choose_output)
         output_row.addWidget(self.output_edit, 1)
         output_row.addWidget(browse)
+        self.output_browse_button = browse
         header_layout.addRow("Output folder", output_row)
         self.canvas_layout.addWidget(self.header)
 
@@ -218,6 +225,7 @@ class ExportPanel(QWidget):
             return
         self.selected.clear()
         self.item_type = item_type
+        self.output_edit.setText(self.output_dirs[item_type])
         self._refresh_selected()
         self._set_type_content()
 
@@ -631,6 +639,8 @@ class ExportPanel(QWidget):
         folder = QFileDialog.getExistingDirectory(self, "Choose export folder", self.output_edit.text())
         if folder:
             self.output_edit.setText(folder)
+            self.output_dirs[self.item_type] = folder
+            self.settings.setValue(f"exportDirectories/{self.item_type}", folder)
 
     def _start_export(self):
         if not self.selected:
@@ -650,12 +660,17 @@ class ExportPanel(QWidget):
         self.export_button.setEnabled(False)
         self.export_button.setText("Exporting...")
         self.type_combo.setEnabled(False)
+        self.output_browse_button.setEnabled(False)
         rows = list(self.selected.values())
         progress = ExportProgressDialog(len(rows), self)
         progress.status.setText(f"Exporting {self.item_type.lower()}...")
         self._progress_dialog = progress
 
-        job = ExportJob(rows, self.item_type, options, Path(self.output_edit.text()), self)
+        if self.item_type == "Cards":
+            options["all_card_rows"] = self.cards
+        output_dir = Path(self.output_edit.text())
+        self._active_output_dir = output_dir
+        job = ExportJob(rows, self.item_type, options, output_dir, self)
         job.progress.connect(self._update_export_progress)
         job.message.connect(self._show_export_message)
         job.finished.connect(self._export_finished)
@@ -684,6 +699,8 @@ class ExportPanel(QWidget):
         self.export_button.setEnabled(True)
         self.export_button.setText("Export")
         self.type_combo.setEnabled(True)
+        self.output_browse_button.setEnabled(True)
+        output_dir = str(self._active_output_dir)
         if errors:
             details = (f"Warnings:\n{warnings}\n\n" if warnings else "") + f"Errors:\n{errors}"
             dialog = ExportSummaryDialog(
@@ -696,17 +713,21 @@ class ExportPanel(QWidget):
         elif warnings:
             dialog = ExportSummaryDialog(
                 "Export completed with warnings",
-                f"Exported {succeeded} {self.item_type.lower()} with warnings to:\n{self.output_edit.text()}",
+                f"Exported {succeeded} {self.item_type.lower()} with warnings to:\n{output_dir}",
                 f"Warnings:\n{warnings}",
                 self,
             )
             dialog.exec()
-        else:
-            QMessageBox.information(
+        if succeeded:
+            answer = QMessageBox.question(
                 self,
-                "Export complete",
-                f"Exported {succeeded} {self.item_type.lower()} to:\n{self.output_edit.text()}",
+                "Open export folder?",
+                f"Exported {succeeded} {self.item_type.lower()} to:\n{output_dir}\n\nOpen this folder?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
             )
+            if answer == QMessageBox.Yes and not open_folder(output_dir):
+                QMessageBox.warning(self, "Could not open folder", f"Could not open the export folder:\n{output_dir}")
 
     def closeEvent(self, event):
         active_jobs = [job for job in self._export_jobs if job.is_running()]

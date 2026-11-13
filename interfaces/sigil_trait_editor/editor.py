@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from model import DEFAULT_CONFIG, sigils
-from ..gui_helpers import Gemification, NoWheelComboBox, ROOT, _split, _join, create_card_preview
+from ..gui_helpers import Gemification, NoWheelComboBox, ROOT, _split, _join, create_card_preview, safe_filename
 from .data import (
     CONDUIT_SIGIL_ICON_DIR,
     SIGIL_ICON_DIR,
@@ -565,7 +565,7 @@ class SigilTraitEditor(QWidget):
                 img = sigils.TRAITS[self.current_name].getImage(config=DEFAULT_CONFIG, color_map=sigils.get_color_mapping("default"))
                 export_dir = ROOT / "exports" / "traits"
             export_dir.mkdir(parents=True, exist_ok=True)
-            target = export_dir / f"{name}.png"
+            target = export_dir / f"{safe_filename(name)}.png"
             img.save(target)
             QMessageBox.information(
                 self,
@@ -596,6 +596,41 @@ class SigilTraitEditor(QWidget):
             return
 
         self.data = self.repository.delete_item(self.data, self.current_section, self.current_name)
+        item_name = self.current_name
+        export_dirs = (
+            (
+                ("sigils", f"{item_name}.png"),
+                ("short sigils", f"{item_name}.png"),
+                ("base game sigils", f"{item_name}.png"),
+                ("sigil patches", f"{item_name}_patch.png"),
+                ("sigil icons", f"{item_name}.png"),
+            )
+            if self.current_section == "Sigils"
+            else (("traits", f"{item_name}.png"),)
+        )
+        delete_exports = QMessageBox.question(
+            self,
+            "Delete exports?",
+            f"Also delete exports for '{item_name}'?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if delete_exports == QMessageBox.Yes:
+            export_root = ROOT / "exports"
+            failures = []
+            for folder, filename in export_dirs:
+                target = export_root / folder / safe_filename(filename)
+                try:
+                    if target.is_file():
+                        target.unlink()
+                except OSError as error:
+                    failures.append(f"{target}: {error}")
+            if failures:
+                QMessageBox.warning(
+                    self,
+                    "Could not delete all exports",
+                    "\n".join(failures),
+                )
         self.current_name = ""
         self._refresh_search()
         self._new_item()
