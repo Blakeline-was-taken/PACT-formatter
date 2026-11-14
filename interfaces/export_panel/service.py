@@ -123,6 +123,32 @@ def _export_card(row, options, output_dir, filename=None):
     return [destination]
 
 
+def _render_sigil(item, format_name, color, color_map):
+    if format_name == "Standard":
+        return item.getImage(color=color, config=DEFAULT_CONFIG, color_map=color_map)
+    if format_name == "Shortened":
+        return item.getImage(shortened_format=True, color=color, config=DEFAULT_CONFIG, color_map=color_map)
+    if format_name == "Base game":
+        return item.getImage(base_game=True, color=color, config=DEFAULT_CONFIG, color_map=color_map)
+    if format_name == "Patch":
+        patch_path = GENERAL_ASSETS_DIR / "patch.png"
+        with Image.open(patch_path) as patch_source:
+            patch = patch_source.convert("RGBA")
+        icon = item.sigilImage(color=color)
+        position = ((patch.width - icon.width) // 2, (patch.height - icon.height) // 2)
+        return cards.paste_sigil(patch, icon, position)
+    raise ValueError(f"Unsupported sigil export format: {format_name}")
+
+
+def _sigil_export_folder(format_name):
+    return {
+        "Standard": "sigils",
+        "Shortened": "short sigils",
+        "Base game": "base game sigils",
+        "Patch": "sigil patches",
+    }[format_name]
+
+
 def _export_sigil(row, options, output_dir):
     item = sigils.SIGILS[row["Name"]].copy()
     color = options["color"]
@@ -131,38 +157,40 @@ def _export_sigil(row, options, output_dir):
         raise ValueError("At least one sigil export format must be selected.")
     destinations = []
     for format_name in options["formats"]:
-        if format_name == "Standard":
-            image = item.getImage(color=color, config=DEFAULT_CONFIG, color_map=color_map)
-            folder = "sigils"
-        elif format_name == "Shortened":
-            image = item.getImage(shortened_format=True, color=color, config=DEFAULT_CONFIG, color_map=color_map)
-            folder = "short sigils"
-        elif format_name == "Base game":
-            image = item.getImage(base_game=True, color=color, config=DEFAULT_CONFIG, color_map=color_map)
-            folder = "base game sigils"
-        elif format_name == "Patch":
-            patch_path = GENERAL_ASSETS_DIR / "patch.png"
-            with Image.open(patch_path) as patch_source:
-                patch = patch_source.convert("RGBA")
-            icon = item.sigilImage(color=color)
-            position = ((patch.width - icon.width) // 2, (patch.height - icon.height) // 2)
-            image = cards.paste_sigil(patch, icon, position)
-            folder = "sigil patches"
-        else:
-            raise ValueError(f"Unsupported sigil export format: {format_name}")
+        image = _render_sigil(item, format_name, color, color_map)
+        folder = _sigil_export_folder(format_name)
         suffix = "_patch" if format_name == "Patch" else ""
         destination = output_dir / folder / f"{_safe_name(item.name)}{suffix}.png"
         destinations.append(_save_image(image, destination))
     return destinations
 
 
-def _export_trait(row, options, output_dir):
+def _render_trait(row, color):
     item = sigils.TRAITS[row["Name"]].copy()
-    color_map = _default_color_map()
-    image = item.getImage(color=options["color"], config=DEFAULT_CONFIG, color_map=color_map)
+    return item.getImage(color=color, config=DEFAULT_CONFIG, color_map=_default_color_map())
+
+
+def _export_trait(row, options, output_dir):
+    image = _render_trait(row, options["color"])
     destination = output_dir / "traits" / f"{_safe_name(row['Name'])}.png"
     _save_image(image, destination)
     return [destination]
+
+
+def render_export_preview(row, item_type, options):
+    """Render one item in memory using the same routine as its export."""
+    if item_type == "Cards":
+        _validate_card_effects(row)
+        return cards.create_card(row)
+    if item_type == "Sigils":
+        formats = options.get("formats", [])
+        if not formats:
+            raise ValueError("At least one sigil export format must be selected.")
+        item = sigils.SIGILS[row["Name"]].copy()
+        return _render_sigil(item, formats[0], options["color"], _default_color_map())
+    if item_type == "Traits":
+        return _render_trait(row, options["color"])
+    raise ValueError(f"Unsupported export type: {item_type}")
 
 
 def _export_row(row, item_type, options, output_dir, card_filename=None):

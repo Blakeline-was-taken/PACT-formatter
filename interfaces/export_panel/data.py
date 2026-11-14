@@ -106,6 +106,8 @@ def matches_stat(value, operator, target):
 
 
 def crop_card_art(art):
-    crop_top = round(art.height() * 0.10)
+    crop_left = round(art.width() * 0.1)
+    crop_right = round(art.width() * 0.1)
+    crop_top = round(art.height() * 0.2)
     crop_bottom = round(art.height() * 0.40)
-    return art.copy(0, crop_top, art.width(), art.height() - crop_top - crop_bottom,)
+    return art.copy(crop_left, crop_top, art.width() - crop_left - crop_right, art.height() - crop_top - crop_bottom,)

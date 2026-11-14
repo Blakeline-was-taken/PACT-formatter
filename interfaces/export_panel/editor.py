@@ -45,6 +45,10 @@ from .data import (
 )
 from .service import ExportJob
 from .widgets import (
+    CARD_PREVIEW_SIZE,
+    PATCH_PREVIEW_SIZE,
+    SIGIL_PREVIEW_SIZE,
+    TRAIT_PREVIEW_SIZE,
     DragSelectListWidget,
     ExportProgressDialog,
     ExportResultsDelegate,
@@ -87,8 +91,8 @@ class ExportPanel(QWidget):
         self.selected_list_items = {}
         self.visible_rows = []
         self.result_model = ExportResultsModel(self)
+        self.result_model.previewFailed.connect(self._preview_failed)
         self._drag_selecting = False
-        self.filter_column_count = None
         self._export_jobs = []
         self._progress_dialog = None
         self._refresh_timer = QTimer(self)
@@ -100,36 +104,26 @@ class ExportPanel(QWidget):
 
     def _build_ui(self):
         root = QHBoxLayout(self)
-        root.setContentsMargins(24, 20, 24, 20)
-        root.setSpacing(16)
+        root.setContentsMargins(16, 16, 16, 16)
+        root.setSpacing(12)
 
-        self.left_column = QWidget()
-        self.left_column.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Expanding)
-        left_layout = QVBoxLayout(self.left_column)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(12)
-        self.canvas = QWidget()
-        self.canvas.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
-        self.canvas_layout = QVBoxLayout(self.canvas)
-        self.canvas_layout.setContentsMargins(0, 0, 0, 0)
-        self.canvas_layout.setSpacing(12)
-        title = QLabel("Export")
-        title.setObjectName("pageTitle")
-        left_layout.addWidget(title)
-        description = QLabel("Filter the available data, select the items to export, then export them together.")
-        description.setObjectName("pageDescription")
-        description.setWordWrap(True)
-        left_layout.addWidget(description)
+        filter_column = QWidget()
+        filter_column.setMinimumWidth(220)
+        filter_column.setMaximumWidth(300)
+        filter_column.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        filter_column_layout = QVBoxLayout(filter_column)
+        filter_column_layout.setContentsMargins(0, 0, 0, 0)
+        filter_column_layout.setSpacing(8)
 
         self.header = QGroupBox("Export setup")
-        self.header.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        self.header.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
         header_layout = QFormLayout(self.header)
         self.type_combo = NoWheelComboBox()
         self.type_combo.addItems(EXPORT_TYPES)
         self.type_combo.currentTextChanged.connect(self._change_type)
         header_layout.addRow("Export type", self.type_combo)
         self.options_widget = QWidget()
-        self.options_layout = QHBoxLayout(self.options_widget)
+        self.options_layout = QVBoxLayout(self.options_widget)
         self.options_layout.setContentsMargins(0, 0, 0, 0)
         header_layout.addRow("Options", self.options_widget)
         output_row = QHBoxLayout()
@@ -141,22 +135,43 @@ class ExportPanel(QWidget):
         output_row.addWidget(browse)
         self.output_browse_button = browse
         header_layout.addRow("Output folder", output_row)
-        self.canvas_layout.addWidget(self.header)
+        filter_column_layout.addWidget(self.header)
 
-        self.filter_grid_widget = QWidget()
-        self.filter_grid_widget.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
-        self.filter_grid = QGridLayout(self.filter_grid_widget)
-        self.filter_grid.setContentsMargins(0, 0, 0, 0)
-        self.filter_grid.setSpacing(8)
-        for column in range(4):
-            self.filter_grid.setColumnStretch(column, 1)
-        self.canvas_layout.addWidget(self.filter_grid_widget)
+        filter_title = QLabel("Filters")
+        filter_title.setObjectName("sectionTitle")
+        filter_column_layout.addWidget(filter_title)
+        self.filter_content = QWidget()
+        self.filter_layout = QVBoxLayout(self.filter_content)
+        self.filter_layout.setContentsMargins(8, 8, 8, 8)
+        self.filter_layout.setSpacing(12)
+        self.filter_scroll = QScrollArea()
+        self.filter_scroll.setWidgetResizable(True)
+        self.filter_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.filter_scroll.setWidget(self.filter_content)
+        filter_column_layout.addWidget(self.filter_scroll, 1)
+        root.addWidget(filter_column)
+
+        self.collection_column = QWidget()
+        collection_layout = QVBoxLayout(self.collection_column)
+        collection_layout.setContentsMargins(0, 0, 0, 0)
+        collection_layout.setSpacing(10)
+        title = QLabel("Export")
+        title.setObjectName("pageTitle")
+        collection_layout.addWidget(title)
+        description = QLabel("Filter the available data, select the items to export, then export them together.")
+        description.setObjectName("pageDescription")
+        description.setWordWrap(True)
+        collection_layout.addWidget(description)
 
         result_header = QHBoxLayout()
         result_title = QLabel("Available items")
         result_title.setObjectName("sectionTitle")
         self.result_count = QLabel()
         self.result_count.setObjectName("mutedText")
+        self.preview_button = QPushButton("See preview")
+        self.preview_button.setCheckable(True)
+        self.preview_button.setToolTip("Sigil previews use the first selected export format.")
+        self.preview_button.toggled.connect(self._toggle_preview)
         select_all = QPushButton("Select all")
         select_all.clicked.connect(self._select_all_visible)
         deselect_all = QPushButton("Deselect all")
@@ -164,30 +179,26 @@ class ExportPanel(QWidget):
         result_header.addWidget(result_title)
         result_header.addStretch()
         result_header.addWidget(self.result_count)
+        result_header.addWidget(self.preview_button)
         result_header.addWidget(select_all)
         result_header.addWidget(deselect_all)
-        self.canvas_layout.addLayout(result_header)
+        collection_layout.addLayout(result_header)
+        self.preview_error_label = QLabel()
+        self.preview_error_label.setWordWrap(True)
+        self.preview_error_label.setObjectName("mutedText")
+        self.preview_error_label.hide()
+        collection_layout.addWidget(self.preview_error_label)
         self.results = ExportResultsView()
         self.results.setModel(self.result_model)
         self.results_delegate = ExportResultsDelegate(self.result_model, self.results)
         self.results.setItemDelegate(self.results_delegate)
-        self.results.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        self.results.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.results.itemPressed.connect(self._result_item_pressed)
         self.results.itemHovered.connect(self._result_item_hovered)
         self.results.selectionDragFinished.connect(self._finish_result_drag_selection)
         self.results.resized.connect(self._update_result_columns)
-        self.canvas_layout.addWidget(self.results)
-
-        self.export_panel = QGroupBox("Export panel")
-        export_panel_layout = QVBoxLayout(self.export_panel)
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll.setWidget(self.canvas)
-        export_panel_layout.addWidget(scroll)
-        left_layout.addWidget(self.export_panel, 1)
-
-        root.addWidget(self.left_column, 1)
+        collection_layout.addWidget(self.results, 1)
+        root.addWidget(self.collection_column, 1)
         root.addWidget(self._build_sidebar())
 
     def _build_sidebar(self):
@@ -239,7 +250,7 @@ class ExportPanel(QWidget):
                 self._clear_layout(item.layout())
 
     def _set_type_content(self):
-        self._clear_layout(self.filter_grid)
+        self._clear_layout(self.filter_layout)
         self._clear_layout(self.options_layout)
         if self.item_type == "Cards":
             self._build_card_options()
@@ -250,35 +261,13 @@ class ExportPanel(QWidget):
         else:
             self._build_item_options("Traits")
             self._build_item_filters(self.traits)
-        self._update_filter_columns()
+        self.filter_layout.addStretch()
+        QTimer.singleShot(0, self._refresh_filter_scroll)
         self._refresh_results()
 
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        QTimer.singleShot(0, self._update_filter_columns)
-
-    def _update_filter_columns(self):
-        if not hasattr(self, "filter_grid") or not self.filter_grid.count():
-            return
-        if self.item_type == "Cards":
-            scroll = self.export_panel.findChild(QScrollArea)
-            available_width = scroll.viewport().width() if scroll else self.export_panel.width()
-            columns = 4 if available_width >= 756 else 2
-        else:
-            columns = 2
-        if columns == self.filter_column_count:
-            return
-
-        boxes = []
-        while self.filter_grid.count():
-            item = self.filter_grid.takeAt(0)
-            if item.widget():
-                boxes.append(item.widget())
-        for index, box in enumerate(boxes):
-            self.filter_grid.addWidget(box, index // columns, index % columns)
-        for column in range(4):
-            self.filter_grid.setColumnStretch(column, int(column < columns))
-        self.filter_column_count = columns
+    def _refresh_filter_scroll(self):
+        self.filter_scroll.takeWidget()
+        self.filter_scroll.setWidget(self.filter_content)
 
     def _build_card_options(self):
         self.sorted_option = QCheckBox("Sort into Temple/Tier folders")
@@ -296,6 +285,7 @@ class ExportPanel(QWidget):
             for label in ("Standard", "Shortened", "Base game", "Patch"):
                 check = QCheckBox(label)
                 check.setChecked(label == "Standard")
+                check.toggled.connect(self._preview_options_changed)
                 self.options_layout.addWidget(check)
                 self.format_checks[label] = check
         else:
@@ -306,11 +296,41 @@ class ExportPanel(QWidget):
 
     def _set_export_color(self, color):
         self.export_color = color
+        self._preview_options_changed()
 
-    def _filter_box(self, title, row, column):
-        box = QGroupBox(title)
+    def _preview_options(self):
+        if self.item_type == "Sigils":
+            return {
+                "formats": [name for name, check in self.format_checks.items() if check.isChecked()],
+                "color": self.export_color,
+            }
+        if self.item_type == "Traits":
+            return {"color": self.export_color}
+        return {}
+
+    def _preview_options_changed(self, *_):
+        self.result_model.set_preview_mode(self.preview_button.isChecked(), self._preview_options())
+        self._update_result_columns()
+
+    def _toggle_preview(self, enabled):
+        self.preview_button.setText("Show raw assets" if enabled else "See preview")
+        self.preview_error_label.clear()
+        self.preview_error_label.hide()
+        self._preview_options_changed()
+
+    def _preview_failed(self, item_name, error):
+        self.preview_error_label.setText(f"Could not preview {item_name}: {error}")
+        self.preview_error_label.show()
+
+    def _filter_box(self, title):
+        box = QWidget()
         layout = QVBoxLayout(box)
-        self.filter_grid.addWidget(box, row, column)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(5)
+        heading = QLabel(title)
+        heading.setObjectName("filterSectionTitle")
+        layout.addWidget(heading)
+        self.filter_layout.addWidget(box)
         return layout
 
     def _labeled_filter(self, label, field, layout):
@@ -340,7 +360,7 @@ class ExportPanel(QWidget):
         names = [_display_name(row.get("Card Name", "")) for row in self.cards]
         temples = [row.get("Temple", "") for row in self.cards]
         tiers = [row.get("Tier", "") for row in self.cards]
-        data = self._filter_box("Card Data", 0, 0)
+        data = self._filter_box("Card Data")
         self.name_filter = self._autocomplete(names, "Card name")
         self.temple_filter = self._autocomplete(temples, "Temple")
         self.tier_filter = self._autocomplete(tiers, "Tier")
@@ -348,7 +368,7 @@ class ExportPanel(QWidget):
         self._labeled_filter("Temple", self.temple_filter, data)
         self._labeled_filter("Tier", self.tier_filter, data)
 
-        costs_box = self._filter_box("Cost", 0, 1)
+        costs_box = self._filter_box("Cost")
         self.cost_checks = {}
         cost_grid = QGridLayout()
         for index, (label, key) in enumerate(COST_FILTERS):
@@ -368,7 +388,7 @@ class ExportPanel(QWidget):
         costs_box.addWidget(self.cost_all)
         costs_box.addWidget(self.cost_only)
 
-        stats = self._filter_box("Stats", 0, 2)
+        stats = self._filter_box("Stats")
         self.stat_controls = {}
         for stat in ("Power", "Health"):
             row = QHBoxLayout()
@@ -388,13 +408,13 @@ class ExportPanel(QWidget):
             setattr(self, f"has_{stat.lower()}_sigil_filter", has_sigil)
             self.stat_controls[stat] = (operator, value)
 
-        for category, field, row, column in (
-            ("Sigils", "Sigils", 0, 3),
-            ("Traits", "Traits", 1, 0),
-            ("Tribes", "Tribes", 1, 1),
-            ("Artists", "Credit", 1, 2),
+        for category, field in (
+            ("Sigils", "Sigils"),
+            ("Traits", "Traits"),
+            ("Tribes", "Tribes"),
+            ("Artists", "Credit"),
         ):
-            box = self._filter_box(category, row, column)
+            box = self._filter_box(category)
             values = []
             for card in self.cards:
                 values.extend(_card_filter_values(card, category, field))
@@ -414,19 +434,13 @@ class ExportPanel(QWidget):
             setattr(self, f"{category.lower()}_all", all_check)
             setattr(self, f"{category.lower()}_only", only_check)
 
-        tags = self._filter_box("Tags", 1, 3)
-        self.background_filter = self._autocomplete(
-            (tag[:-3] for card in self.cards for tag in _split_list(card.get("Tags", "")) if tag.endswith("_bg")),
-            "Background sigil tag",
-        )
+        tags = self._filter_box("Tags")
+        self.background_filter = self._autocomplete((tag[:-3] for card in self.cards for tag in _split_list(card.get("Tags", "")) if tag.endswith("_bg")), "Background sigil tag")
         self.extra_cells_filter = OptionalSpinBox()
         self.extra_cells_filter.valueChanged.connect(self._schedule_results_refresh)
         symbol_names = (_display_name(row.get("Name", "")) for row in self.sigils)
         self.symbol_1_filter = self._autocomplete(symbol_names, "Symbol 1")
-        self.symbol_2_filter = self._autocomplete(
-            (_display_name(row.get("Name", "")) for row in self.sigils),
-            "Symbol 2",
-        )
+        self.symbol_2_filter = self._autocomplete((_display_name(row.get("Name", "")) for row in self.sigils), "Symbol 2")
         for label, widget in (
             ("Background", self.background_filter),
             ("Extra Cells", self.extra_cells_filter),
@@ -446,21 +460,19 @@ class ExportPanel(QWidget):
         tags.addWidget(symbols)
 
     def _build_item_filters(self, rows):
-        data = self._filter_box(f"{self.item_type[:-1]} Data", 0, 0)
+        data = self._filter_box(f"{self.item_type[:-1]} Data")
         self.item_name_filter = self._autocomplete(
             (_display_name(row.get("Name", "")) for row in rows),
             f"Search {self.item_type[:-1].lower()} name...",
         )
         self._labeled_filter(f"{self.item_type[:-1]} Name", self.item_name_filter, data)
-        tags = self._filter_box("Tags", 0, 1)
+        tags = self._filter_box("Tags")
         self.item_tag_checks = {}
         for tag in ITEM_TAG_FILTERS:
             check = QCheckBox(tag.replace("_", " ").title())
             check.toggled.connect(self._schedule_results_refresh)
             self.item_tag_checks[tag] = check
             tags.addWidget(check)
-        self.filter_grid.setColumnStretch(0, 1)
-        self.filter_grid.setColumnStretch(1, 1)
 
     def _matches_values(self, values, selected, require_all, require_only):
         if not selected:
@@ -535,18 +547,39 @@ class ExportPanel(QWidget):
     def _update_result_columns(self):
         if not hasattr(self, "results") or not hasattr(self, "results_delegate"):
             return
-        available_width = max(self.results.viewport().width(), 1)
-        minimum_tile_width = 120
+        scrollbar = self.results.verticalScrollBar()
+        available_width = self.results.viewport().width()
+        if scrollbar.isVisible():
+            available_width += scrollbar.width()
+        available_width = max(available_width - scrollbar.sizeHint().width(), 1)
+        large_preview = self.preview_button.isChecked()
+        if large_preview:
+            preview_size = CARD_PREVIEW_SIZE
+            if self.item_type == "Traits":
+                preview_size = TRAIT_PREVIEW_SIZE
+            elif self.item_type == "Sigils":
+                formats = self._preview_options()["formats"]
+                if formats and formats[0] == "Patch":
+                    preview_size = PATCH_PREVIEW_SIZE
+                elif not formats or formats[0] in ("Standard", "Shortened"):
+                    preview_size = SIGIL_PREVIEW_SIZE
+            self.results_delegate.preview_icon_size = preview_size
+            minimum_tile_width = preview_size.width() + 8
+        else:
+            minimum_tile_width = 120
         columns = max(1, available_width // minimum_tile_width)
         tile_width = max(minimum_tile_width, available_width // columns)
         row_count = (len(self.visible_rows) + columns - 1) // columns
-        # A single result row otherwise clips labels in the collapsed scroll viewport.
-        tile_height = 150 if row_count == 1 else 130
+        if large_preview:
+            extra_height = 60 if self.item_type == "Cards" else 52
+            tile_height = self.results_delegate.preview_icon_size.height() + extra_height
+        else:
+            tile_height = 150 if row_count == 1 else 130
         tile_size = QSize(tile_width, tile_height)
         self.results_delegate.tile_size = tile_size
         self.results.setGridSize(tile_size)
         self.result_column_count = columns
-        self.results.setMinimumHeight(max(tile_height, row_count * tile_height))
+        self.results.setMinimumHeight(tile_height)
         self.results.doItemsLayout()
 
     def _refresh_results(self, *_):
@@ -557,6 +590,7 @@ class ExportPanel(QWidget):
         self.result_count.setText(f"{len(rows)} items")
         self.result_model.set_rows(rows, self.item_type)
         self.result_model.set_selected_keys(self.selected)
+        self.result_model.set_preview_mode(self.preview_button.isChecked(), self._preview_options())
         self._update_result_columns()
 
     def _result_item_pressed(self, row_index):

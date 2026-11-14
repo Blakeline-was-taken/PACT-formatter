@@ -2,6 +2,7 @@
 
 import sys
 
+from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QApplication,
@@ -26,8 +27,36 @@ class EditorWindow(QMainWindow):
         self.setWindowTitle("PACT Formatter")
         self.setMinimumSize(960, 640)
         self.resize(1180, 760)
+        self.settings = QSettings("Blakeline-was-taken", "PACT Formatter")
+        self._restore_window_preferences()
         self._build_tabs()
         self.statusBar().showMessage("Ready")
+
+    def _restore_window_preferences(self):
+        geometry = self.settings.value("window/geometry")
+        if geometry:
+            self.restoreGeometry(geometry)
+
+        mode = self.settings.value("window/mode", "windowed")
+        if mode == "fullscreen":
+            self.setWindowState(self.windowState() | Qt.WindowFullScreen)
+        elif mode == "maximized":
+            self.setWindowState(self.windowState() | Qt.WindowMaximized)
+
+    def _save_window_preferences(self):
+        if self.isFullScreen():
+            mode = "fullscreen"
+        elif self.isMaximized():
+            mode = "maximized"
+        else:
+            mode = "windowed"
+            self.settings.setValue("window/geometry", self.saveGeometry())
+        self.settings.setValue("window/mode", mode)
+        self.settings.sync()
+
+    def closeEvent(self, event):
+        self._save_window_preferences()
+        super().closeEvent(event)
 
     def _build_tabs(self):
         """Create each editor page and install it in the central tab widget."""
@@ -126,6 +155,10 @@ def _apply_style(app):
         #pageTitle { font-size: 26px; font-weight: 600; }
         #pageDescription { color: #586579; font-size: 13px; }
         #sectionTitle { font-size: 18px; font-weight: 600; }
+        #filterSectionTitle {
+            color: #334155; font-size: 13px; font-weight: 600;
+            border-bottom: 1px solid #dce2ec; padding-bottom: 4px;
+        }
         QGroupBox {
             background: #ffffff; border: 1px solid #dce2ec;
             border-radius: 6px; margin-top: 10px; padding-top: 18px;

@@ -1,7 +1,7 @@
 """Reusable Qt controls and result-grid components for export."""
 
 from PySide6.QtCore import QAbstractListModel, QModelIndex, QRect, QSize, Qt, Signal
-from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
+from PySide6.QtGui import QColor, QIcon, QImage, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -22,11 +22,51 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from PIL.ImageQt import ImageQt
 
+from model import ASSETS_DIR, GENERAL_ASSETS_DIR
 from ..gui_helpers import NoWheelComboBox, NoWheelSpinBox
 from ..card_editor.data import ASSET_PATH
 from ..sigil_trait_editor.data import SIGIL_ICON_DIR, normalize_sigil_name
 from .data import crop_card_art as _crop_card_art, display_name as _display_name
+
+
+CARD_THUMBNAIL_SIZE = QSize(104, 86)
+CARD_PREVIEW_SIZE = QSize(176, 220)
+SIGIL_PREVIEW_SIZE = QSize(176, 66)
+TRAIT_PREVIEW_SIZE = QSize(176, 82)
+PATCH_PREVIEW_SIZE = QSize(176, 168)
+_TEMPLE_BACKGROUND_COLORS = {}
+
+
+def _temple_background_color(temple):
+    key = (temple or "").casefold()
+    if key not in _TEMPLE_BACKGROUND_COLORS:
+        palette_path = ASSETS_DIR / key / "colors.png"
+        if not palette_path.is_file():
+            palette_path = GENERAL_ASSETS_DIR / "colors.png"
+        palette = QImage(str(palette_path))
+        if palette.isNull() or palette.width() < 2:
+            raise ValueError(f"Could not read the second temple palette color from {palette_path}.")
+        _TEMPLE_BACKGROUND_COLORS[key] = palette.pixelColor(1, 0)
+    return _TEMPLE_BACKGROUND_COLORS[key]
+
+
+def _framed_card_pixmap(art, temple, size=CARD_THUMBNAIL_SIZE, use_temple_color=True):
+    thumbnail = QPixmap(size)
+    thumbnail.fill(Qt.transparent)
+    available_size = size - QSize(4, 4)
+    scaled_art = art.scaled(available_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+    left = (thumbnail.width() - scaled_art.width()) // 2
+    top = (thumbnail.height() - scaled_art.height()) // 2
+    painter = QPainter(thumbnail)
+    if use_temple_color:
+        painter.fillRect(QRect(left, top, scaled_art.width(), scaled_art.height()), _temple_background_color(temple),)
+    painter.drawPixmap(left, top, scaled_art)
+    painter.setPen(QPen(QColor(Qt.black), 2))
+    painter.drawRect(QRect(left, top, scaled_art.width() - 1, scaled_art.height() - 1))
+    painter.end()
+    return thumbnail
 
 
 class ExportProgressDialog(QDialog):
@@ -149,6 +189,7 @@ class DragSelectListWidget(QListWidget):
 class ExportResultsModel(QAbstractListModel):
     """Lightweight filtered item model with lazily loaded thumbnail icons."""
 
+    previewFailed = Signal(str, str)
     ITEM_KEY_ROLE = Qt.UserRole + 1
     SELECTED_ROLE = Qt.UserRole + 2
 
@@ -159,6 +200,8 @@ class ExportResultsModel(QAbstractListModel):
         self.icons = {}
         self.row_indexes = {}
         self.item_type = "Cards"
+        self.preview_mode = False
+        self.preview_options = {}
 
     def rowCount(self, parent=QModelIndex()):
         return 0 if parent.isValid() else len(self.rows)
@@ -182,11 +225,23 @@ class ExportResultsModel(QAbstractListModel):
         return None
 
     def set_rows(self, rows, item_type):
+        if self.item_type != item_type:
+            self.icons.clear()
         self.beginResetModel()
         self.rows = rows
         self.item_type = item_type
         self.row_indexes = {id(row): index for index, row in enumerate(rows)}
         self.endResetModel()
+
+    def set_preview_mode(self, enabled, options=None):
+        options = dict(options or {})
+        if self.preview_mode == enabled and self.preview_options == options:
+            return
+        self.preview_mode = enabled
+        self.preview_options = options
+        self.icons.clear()
+        if self.rows:
+            self.dataChanged.emit(self.index(0, 0), self.index(len(self.rows) - 1, 0), [Qt.DecorationRole])
 
     def set_selected(self, key, selected):
         if selected:
@@ -205,11 +260,24 @@ class ExportResultsModel(QAbstractListModel):
 
     def _icon_for_row(self, row, key):
         if key not in self.icons:
-            if self.item_type == "Cards":
+            if self.preview_mode:
+                try:
+                    from .service import render_export_preview
+
+                    image = render_export_preview(row, self.item_type, self.preview_options)
+                    pixmap = QPixmap.fromImage(ImageQt(image.convert("RGBA")))
+                    if self.item_type == "Cards":
+                        pixmap = _framed_card_pixmap(pixmap, row.get("Temple", ""), CARD_PREVIEW_SIZE, use_temple_color=False)
+                    self.icons[key] = QIcon(pixmap)
+                except Exception as error:
+                    item_name = row.get("Card Name", row.get("Name", "Item"))
+                    self.icons[key] = QIcon()
+                    self.previewFailed.emit(item_name, str(error) or type(error).__name__)
+            elif self.item_type == "Cards":
                 art_path = ASSET_PATH / (row.get("Art File") or "")
                 if art_path.is_file():
                     pixmap = QPixmap(str(art_path))
-                    self.icons[key] = QIcon(_crop_card_art(pixmap))
+                    self.icons[key] = QIcon(_framed_card_pixmap(_crop_card_art(pixmap), row.get("Temple", "")))
                 else:
                     self.icons[key] = QIcon()
             elif self.item_type == "Sigils":
@@ -230,6 +298,7 @@ class ExportResultsDelegate(QStyledItemDelegate):
         super().__init__(parent)
         self.model = model
         self.tile_size = QSize(120, 130)
+        self.preview_icon_size = CARD_PREVIEW_SIZE
 
     def sizeHint(self, option, index):
         return self.tile_size
@@ -245,7 +314,12 @@ class ExportResultsDelegate(QStyledItemDelegate):
 
         icon = index.data(Qt.DecorationRole)
         item_type = self.model.item_type
-        icon_size = QSize(104, 86) if item_type == "Cards" else QSize(54, 86)
+        if self.model.preview_mode:
+            icon_size = self.preview_icon_size
+        elif item_type == "Cards":
+            icon_size = CARD_THUMBNAIL_SIZE
+        else:
+            icon_size = QSize(54, 86)
         icon_rect = QRect(rect.center().x() - icon_size.width() // 2, rect.top() + 6, icon_size.width(), icon_size.height())
         if not icon.isNull():
             icon.paint(painter, icon_rect, Qt.AlignCenter)
@@ -277,7 +351,7 @@ class ExportResultsView(QListView):
         self.setUniformItemSizes(True)
         self.setMouseTracking(True)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self._drag_selecting = False
 
     def mousePressEvent(self, event):
