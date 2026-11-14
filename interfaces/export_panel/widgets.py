@@ -403,9 +403,11 @@ class SelectedValues(QWidget):
 
     changed = Signal()
 
-    def __init__(self, choices, placeholder):
+    def __init__(self, choices, placeholder, option_tooltips=None, unknown_option_tooltip=""):
         super().__init__()
         self.selected = []
+        self.option_tooltips = {key.casefold(): value for key, value in (option_tooltips or {}).items()}
+        self.unknown_option_tooltip = unknown_option_tooltip
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         row = QHBoxLayout()
@@ -419,11 +421,19 @@ class SelectedValues(QWidget):
         self.search.setPlaceholderText(placeholder)
         self.search.setToolTip("Search for a value, then add it to the selected filter values.")
         self.search.addItems(choices)
+        for index, choice in enumerate(choices):
+            tooltip = self.option_tooltips.get(choice.casefold())
+            if tooltip:
+                self.search.setItemData(index, tooltip, Qt.ToolTipRole)
         self.search.setCurrentIndex(-1)
         self.search.setCurrentText("")
         completer = QCompleter(choices, self.search)
         completer.setCaseSensitivity(Qt.CaseInsensitive)
         completer.setFilterMode(Qt.MatchContains)
+        for index, choice in enumerate(choices):
+            tooltip = self.option_tooltips.get(choice.casefold())
+            if tooltip:
+                completer.model().setData(completer.model().index(index, 0), tooltip, Qt.ToolTipRole)
         self.search.setCompleter(completer)
         self.search.lineEdit().returnPressed.connect(self.add_value)
         add = QPushButton("Add")
@@ -461,7 +471,8 @@ class SelectedValues(QWidget):
                 item.widget().deleteLater()
         for index, value in enumerate(self.selected):
             chip = QPushButton(f"{value} [x]")
-            chip.setToolTip(f"Remove {value}")
+            tooltip = self.option_tooltips.get(value.casefold(), self.unknown_option_tooltip)
+            chip.setToolTip(f"{tooltip}\nClick to remove this filter value." if tooltip else f"Remove {value}")
             chip.setMaximumWidth(150)
             chip.clicked.connect(lambda checked=False, item=value: self.remove_value(item))
             self.chips.addWidget(chip, index, 0)

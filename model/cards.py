@@ -11,6 +11,14 @@ from model.text import draw_rich_text, get_inline_icon_size, measure_rich_text, 
 
 
 STAT_GEM_NAMES = {"green", "blue", "orange", "prism"}
+MOX_TAGS = ("mox_green", "mox_orange", "mox_blue", "mox_prism")
+
+
+def tag_values(value):
+    """Return normalized, comma-separated tags for exact tag matching."""
+    if not value or str(value).strip().casefold() == "none":
+        return set()
+    return {tag.strip().casefold() for tag in str(value).split(",") if tag.strip()}
 
 
 def _font_path(config):
@@ -146,15 +154,14 @@ def get_sigil_data(config, csv_dict):
                 for _ in range(target_obj.token_needed):
                     target_obj.addToken(str_tokens[token_id % len(str_tokens)])
                     token_id += 1
-            for tag in target_obj.tags.split(','):
-                tag = tag.strip()
-                if "power_sigil" in tag:
+            for tag in tag_values(target_obj.tags):
+                if tag == "power_sigil":
                     power_sigil = target_obj.sigilImage(config=config)
-                elif "health_sigil" in tag:
+                elif tag == "health_sigil":
                     health_sigil = target_obj.sigilImage(config=config)
-                elif "conduit_sigil" in tag:
+                elif tag == "conduit_sigil":
                     conduit_sigil = target_obj.name.replace(" ", "")
-                elif "mox_" in tag:
+                elif tag in MOX_TAGS:
                     mox_provided.append(tag)
 
     sigil_list = []
@@ -172,11 +179,12 @@ def get_sigil_data(config, csv_dict):
 
 def print_indicators(config, image, csv_dict, bg_modifier=None, mox_provided=[]):
     need_displacement = False
-    if "conduit_indicator" in csv_dict["Tags"]:
+    card_tags = tag_values(csv_dict.get("Tags", ""))
+    if "conduit_indicator" in card_tags:
         conduit_image = get_conduit_indicator(csv_dict["Temple"], csv_dict["Tier"], bg_modifier, config["default_tier"])
         image.paste(conduit_image, (0, 0), conduit_image)
         need_displacement = True
-    if "mox_indicator" in csv_dict["Tags"]:
+    if "mox_indicator" in card_tags:
         # Here, if need_displacement is true, it means we also already have a conduit indicator in place.
         conduit = "conduit_" if need_displacement else ""
         if conduit:
@@ -185,9 +193,9 @@ def print_indicators(config, image, csv_dict, bg_modifier=None, mox_provided=[])
             mox_image = get_mox_indicator(csv_dict["Temple"], csv_dict["Tier"], bg_modifier, config["default_tier"])
         image.paste(mox_image, (0, 0), mox_image)
 
-        possible_moxes = ["mox_green", "mox_orange", "mox_blue", "mox_prism"]
+        possible_moxes = MOX_TAGS
         for mox in possible_moxes:
-            if mox in csv_dict["Tags"] or mox in mox_provided:
+            if mox in card_tags or mox in mox_provided:
                 mox_img = Image.open(GENERAL_ASSETS_DIR / "extras" / "indicators" / f"{conduit}{mox}.png")
                 image.paste(mox_img, (0, 0), mox_img)
                 
@@ -248,14 +256,20 @@ def print_card_cost(config, image, csv_dict):
 
 def print_extra_cell_indicators(config, image, csv_dict, bg_modifier=None):
     for tag in csv_dict["Tags"].split(","):
-        if "extra_cell" in tag.strip():
-            cells = int(tag.strip().split("_")[0])
-            cell_y = config['extra_cells_top_border']
-            cell_image = get_card_asset("extra_cell", "extras/indicators", csv_dict["Temple"], csv_dict["Tier"], bg_modifier, config["default_tier"])
-            for _ in range(cells):
-                image.paste(cell_image, (config['extra_cells_left_border'], cell_y), cell_image)
-                cell_y += cell_image.height - 1
-            return
+        normalized = tag.strip().casefold()
+        suffix = "_extra_cell"
+        if not normalized.endswith(suffix):
+            continue
+        count = normalized[:-len(suffix)]
+        if not count.isdigit():
+            continue
+
+        cells = int(count)
+        cell_y = config['extra_cells_top_border']
+        cell_image = get_card_asset("extra_cell", "extras/indicators", csv_dict["Temple"], csv_dict["Tier"], bg_modifier, config["default_tier"])
+        for _ in range(cells):
+            image.paste(cell_image, (config['extra_cells_left_border'], cell_y), cell_image)
+            cell_y += cell_image.height - 1
 
 
 def print_tribes(config, image, csv_dict, bg_modifier=None):
@@ -276,24 +290,29 @@ def print_tribes(config, image, csv_dict, bg_modifier=None):
 def print_symbols(config, image, csv_dict, bg_modifier=None):
     symbols = [False, False] # Left symbol, Right symbol
 
-    for tag in csv_dict["Tags"].split(","):
-        if "symbol" in tag:
-            right_symbol = "right" in tag
-            if symbols[right_symbol]: # If the symbol has already been added, skip it
-                continue
+    for raw_tag in csv_dict["Tags"].split(","):
+        tag = raw_tag.strip()
+        normalized = tag.casefold()
+        if normalized.endswith("_left_symbol"):
+            right_symbol = False
+            tag_sigil = tag[:-len("_left_symbol")].strip()
+        elif normalized.endswith("_right_symbol"):
+            right_symbol = True
+            tag_sigil = tag[:-len("_right_symbol")].strip()
+        else:
+            continue
+        if not tag_sigil or symbols[right_symbol] or tag_sigil not in sigils.SIGILS:
+            continue
 
-            tag_sigil = tag.split("_")[0].strip()
-            if tag_sigil in sigils.SIGILS:
-                tag_sigil = sigils.SIGILS[tag_sigil].copy()
-                symbols[right_symbol] = True
-                
-                symbol = get_symbol(csv_dict['Temple'], csv_dict['Tier'], bg_modifier, right_symbol, config["default_tier"]).resize(image.size, Image.NEAREST)
-                image.paste(symbol, (0, 0), symbol)
-                coord = config[f'{"right" if right_symbol else "left"}_symbol']
-                sigil_image = tag_sigil.sigilImage(config=config)
-                coord = (coord[0] - sigil_image.width // 2, coord[1] - sigil_image.height // 2)
-                sigil_img = tag_sigil.sigilImage(color=(0, 0, 0) if config['colorless_symbols'] else 'black', config=config)
-                image = paste_sigil(image, sigil_img, coord)
+        tag_sigil = sigils.SIGILS[tag_sigil].copy()
+        symbols[right_symbol] = True
+        symbol = get_symbol(csv_dict['Temple'], csv_dict['Tier'], bg_modifier, right_symbol, config["default_tier"]).resize(image.size, Image.NEAREST)
+        image.paste(symbol, (0, 0), symbol)
+        coord = config[f'{"right" if right_symbol else "left"}_symbol']
+        sigil_image = tag_sigil.sigilImage(config=config)
+        coord = (coord[0] - sigil_image.width // 2, coord[1] - sigil_image.height // 2)
+        sigil_img = tag_sigil.sigilImage(color=(0, 0, 0) if config['colorless_symbols'] else 'black', config=config)
+        image = paste_sigil(image, sigil_img, coord)
     return image
 
 
@@ -797,7 +816,8 @@ def create_card(csv_dict, config_override=None):
     image = get_cardback(csv_dict['Temple'], csv_dict['Tier'], bg_modifier, config["default_tier"])
 
     # Add gemification indicator if needed
-    if "gemified_vanilla" in csv_dict['Tags']:
+    card_tags = tag_values(raw_tags)
+    if "gemified_vanilla" in card_tags:
         vanilla_gemification = get_vanilla_gemification(csv_dict['Temple'], csv_dict['Tier'], bg_modifier, config["default_tier"])
         image.paste(vanilla_gemification, (0, 0), vanilla_gemification)
 
@@ -842,7 +862,7 @@ def create_card(csv_dict, config_override=None):
         write_art_credit(config, color_map, image, draw, csv_dict)
 
     # If a tag calls for it, add a null conduit sigil indicator
-    if not conduit_sigil and "conduit_sigil_indicator" in csv_dict["Tags"]:
+    if not conduit_sigil and "conduit_sigil_indicator" in card_tags:
         conduit_sigil = "NullConduit"
 
     # Print the sigil conduit indicator

@@ -6,6 +6,7 @@ import re
 from model.text import strip_rich_text_tags
 
 from ..card_editor.fields import SigilList
+from ..tag_data import TAG_OPTIONS
 
 
 EXPORT_TYPES = ("Cards", "Sigils", "Traits")
@@ -22,7 +23,7 @@ COST_FILTERS = (
     ("Free", "free"),
 )
 STAT_OPERATORS = ("", "=", ">", ">=", "<", "<=", "!=")
-ITEM_TAG_FILTERS = ("power_sigil", "health_sigil", "conduit_sigil")
+ITEM_TAG_FILTERS = TAG_OPTIONS
 
 
 def load_csv(path):

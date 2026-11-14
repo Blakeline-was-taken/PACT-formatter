@@ -5,6 +5,7 @@ from pathlib import Path
 
 from model import DEFAULT_CONFIG
 from ..gui_helpers import ROOT, _join, _split, safe_filename
+from ..tag_data import TAG_OPTIONS as TAG_OPTIONS
 
 CARDS_PATH = ROOT / DEFAULT_CONFIG["cards_file_path"]
 ASSET_PATH = ROOT / DEFAULT_CONFIG["assets_dir"] / "general_assets" / "card_art"
@@ -16,11 +17,6 @@ CARD_FIELDS = [
     "Card Name", "Art File", "Temple", "Tier", "Cost", "Power", "Health",
     "Sigils", "Token", "Traits", "Tribes", "Flavor Text", "Credit", "Tags",
 ]
-TAG_OPTIONS = [
-    "conduit_indicator", "mox_indicator", "mox_green",
-    "mox_orange", "mox_blue", "mox_prism", "gemified_vanilla",
-    "conduit_sigil_indicator",
-]
 COST_OPTIONS = [
     "blood", "bones", "energy", "max",
     "emerald", "sapphire", "ruby", "prism",
@@ -30,24 +26,32 @@ COST_OPTIONS = [
 
 
 def parse_card_tags(value):
-    """Decode editor-specific background, symbol, and extra-cell tags."""
+    """Separate free-form tags from background, symbol, and extra-cell tags."""
     tags = _split(value)
     background = next((tag[:-3] for tag in tags if tag.lower().endswith("_bg") and tag[:-3]), "").lower()
     symbols = {"left": "", "right": ""}
+    special_tags = set()
     for tag in tags:
+        normalized = tag.casefold()
+        if normalized.endswith("_bg") and normalized[:-3]:
+            special_tags.add(normalized)
         for side in symbols:
             suffix = f"_{side}_symbol"
-            if tag.lower().endswith(suffix) and tag[:-len(suffix)].strip():
+            if normalized.endswith(suffix) and tag[:-len(suffix)].strip():
                 symbols[side] = tag[:-len(suffix)].strip()
-                break
+                special_tags.add(normalized)
+        count = tag.split("_", 1)[0]
+        if normalized.endswith("_extra_cell") and count.isdigit():
+            special_tags.add(normalized)
     extra_cells = 0
     for tag in tags:
         count = tag.split("_", 1)[0]
-        if tag.endswith("_extra_cell") and count.isdigit():
+        if tag.casefold().endswith("_extra_cell") and count.isdigit():
             extra_cells = int(count)
     return {
         "background": background,
         "tags": set(tags),
+        "general_tags": [tag for tag in tags if tag.casefold() not in special_tags],
         "symbols": symbols,
         "extra_cells": extra_cells,
     }

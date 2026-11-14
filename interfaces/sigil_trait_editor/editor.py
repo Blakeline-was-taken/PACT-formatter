@@ -34,21 +34,10 @@ from ..gui_helpers import (
 from .data import (
     CONDUIT_SIGIL_ICON_DIR,
     SIGIL_ICON_DIR,
-    SIGIL_TAG_OPTIONS,
     SigilTraitRepository,
     normalize_sigil_name,
 )
-
-_SIGIL_TAG_TOOLTIPS = {
-    "power_sigil": "Replace a card's power number with this sigil when enabled by the template.",
-    "health_sigil": "Replace a card's health number with this sigil when enabled by the template.",
-    "conduit_sigil": "Use this sigil's matching conduit indicator artwork when available.",
-    "mox_green": "Add a green gem to the Mox indicator when this sigil is on a card with one.",
-    "mox_orange": "Add an orange gem to the Mox indicator when this sigil is on a card with one.",
-    "mox_blue": "Add a blue gem to the Mox indicator when this sigil is on a card with one.",
-    "mox_prism": "Add a prism gem to the Mox indicator when this sigil is on a card with one.",
-}
-
+from ..card_editor.fields import TagList
 
 class SigilTraitEditor(QWidget):
     """Search, edit, preview, and save sigils and traits from their shared CSV files."""
@@ -190,18 +179,9 @@ class SigilTraitEditor(QWidget):
         conduit_icon_layout.addWidget(self.conduit_icon_edit, 1)
         conduit_icon_layout.addWidget(conduit_choose_icon)
 
-        # Tags drive renderer behavior; conduit art is only relevant to sigils.
-        self.tags = QWidget()
-        self.tags.setToolTip("Tags control special rendering behavior for sigils and traits.")
-        tags_layout = QVBoxLayout(self.tags)
-        self.tag_checks = {}
-        for tag in SIGIL_TAG_OPTIONS:
-            check = QPushButton(tag)
-            check.setToolTip(_SIGIL_TAG_TOOLTIPS[tag])
-            check.setCheckable(True)
-            check.toggled.connect(self._changed)
-            self.tag_checks[tag] = check
-            tags_layout.addWidget(check)
+        self.tags = TagList()
+        self.tags.setToolTip("Add known or custom tags.")
+        self.tags.changed.connect(self._changed)
         form.addRow("Tags", self.tags)
         form.addRow("Conduit image", self.conduit_icon_row)
         self.conduit_icon_label = form.labelForField(self.conduit_icon_row)
@@ -338,17 +318,18 @@ class SigilTraitEditor(QWidget):
         conduit_icon = conduit_icon_path.name if row.get("Name") and conduit_icon_path.is_file() else ""
         self.conduit_icon_edit.setText(conduit_icon)
 
-        # Restore tag toggles before recalculating conditional control visibility.
-        tags = set(_split(row.get("Tags", "")))
-        for tag, check in self.tag_checks.items():
-            check.setChecked(tag in tags)
+        self.tags.set_values(_split(row.get("Tags", "")))
         self.loading = False
         self._update_conduit_icon_visibility()
         self._update_preview_visibility()
 
     def _update_conduit_icon_visibility(self):
         """Offer conduit-image selection only for conduit sigils."""
-        is_conduit = self.current_section == "Sigils" and self.type_combo.currentText() == "Sigil" and self.tag_checks["conduit_sigil"].isChecked()
+        is_conduit = (
+            self.current_section == "Sigils"
+            and self.type_combo.currentText() == "Sigil"
+            and any(tag.casefold() == "conduit_sigil" for tag in self.tags.values())
+        )
         self.conduit_icon_row.setVisible(is_conduit)
         self.conduit_icon_label.setVisible(is_conduit)
 
@@ -364,13 +345,8 @@ class SigilTraitEditor(QWidget):
         """Collect the current form values in the CSV item shape."""
         name = self.name_edit.text().strip()
         description = self.description_edit.text().strip()
-        tags = [tag for tag, check in self.tag_checks.items() if check.isChecked()]
-        return {
-            "Name": name,
-            "Description": description,
-            "Tags": _join(tags),
-            "Type": self.type_combo.currentText(),
-        }
+        tags = self.tags.values()
+        return {"Name": name, "Description": description, "Tags": _join(tags), "Type": self.type_combo.currentText()}
 
     def _changed(self):
         """Refresh dependent controls and preview after a user edit."""
@@ -435,12 +411,7 @@ class SigilTraitEditor(QWidget):
                     if key == current_name:
                         del sigils.TRAITS[key]
             else:
-                sigils.TRAITS[current_name] = sigils.Sigil(
-                    current_name,
-                    current_description,
-                    current_tags,
-                    is_trait=True,
-                )
+                sigils.TRAITS[current_name] = sigils.Sigil(current_name, current_description, current_tags, is_trait=True)
                 for key in list(sigils.SIGILS.keys()):
                     if key == current_name:
                         del sigils.SIGILS[key]
@@ -481,12 +452,7 @@ class SigilTraitEditor(QWidget):
 
         icon_dir = CONDUIT_SIGIL_ICON_DIR if conduit else SIGIL_ICON_DIR
         title = "Choose conduit image" if conduit else "Choose sigil icon"
-        filename, _ = QFileDialog.getOpenFileName(
-            self,
-            title,
-            str(icon_dir),
-            "Images (*.png *.jpg *.jpeg *.bmp *.webp)",
-        )
+        filename, _ = QFileDialog.getOpenFileName(self, title, str(icon_dir), "Images (*.png *.jpg *.jpeg *.bmp *.webp)")
         if not filename:
             return
 
@@ -581,12 +547,7 @@ class SigilTraitEditor(QWidget):
                 QMessageBox.No,
             )
             if prompt == QMessageBox.Yes:
-                self._update_cards_for_type_change(
-                    old_name,
-                    name,
-                    source_section,
-                    target_section,
-                )
+                self._update_cards_for_type_change(old_name, name, source_section, target_section)
 
         # Persist once confirmations and any related-card updates are complete.
         self.data = self.repository.write_item(self.data, old_name, name, data, target_section)
@@ -608,11 +569,7 @@ class SigilTraitEditor(QWidget):
             export_dir.mkdir(parents=True, exist_ok=True)
             target = export_dir / f"{safe_filename(name)}.png"
             img.save(target)
-            QMessageBox.information(
-                self,
-                "Exported",
-                f"{name} was exported to {target}.",
-            )
+            QMessageBox.information(self, "Exported", f"{name} was exported to {target}.")
         return True
 
     def _update_cards_for_type_change(self, old_name, new_name, source_section, target_section):
@@ -638,17 +595,16 @@ class SigilTraitEditor(QWidget):
 
         self.data = self.repository.delete_item(self.data, self.current_section, self.current_name)
         item_name = self.current_name
-        export_dirs = (
-            (
+        if self.current_section == "Sigils":
+            export_dirs = (
                 ("sigils", f"{item_name}.png"),
                 ("short sigils", f"{item_name}.png"),
                 ("base game sigils", f"{item_name}.png"),
                 ("sigil patches", f"{item_name}_patch.png"),
                 ("sigil icons", f"{item_name}.png"),
             )
-            if self.current_section == "Sigils"
-            else (("traits", f"{item_name}.png"),)
-        )
+        else:
+            export_dirs = ("traits", f"{item_name}.png")
         delete_exports = QMessageBox.question(
             self,
             "Delete exports?",
@@ -667,11 +623,7 @@ class SigilTraitEditor(QWidget):
                 except OSError as error:
                     failures.append(f"{target}: {error}")
             if failures:
-                QMessageBox.warning(
-                    self,
-                    "Could not delete all exports",
-                    "\n".join(failures),
-                )
+                QMessageBox.warning(self, "Could not delete all exports", "\n".join(failures))
         self.current_name = ""
         self._refresh_search()
         self._new_item()

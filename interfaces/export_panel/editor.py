@@ -30,10 +30,10 @@ from model import sigils
 from ..card_editor.data import CARDS_PATH, parse_card_tags
 from ..gui_helpers import ColorPickerButton, NoWheelComboBox, ROOT, open_folder, set_widget_tooltip
 from ..sigil_trait_editor.data import SIGIL_PATH, TRAIT_PATH
+from ..tag_data import TAG_OPTIONS, TAG_TOOLTIPS
 from .data import (
     COST_FILTERS,
     EXPORT_TYPES,
-    ITEM_TAG_FILTERS,
     STAT_OPERATORS,
     card_filter_values as _card_filter_values,
     cost_tokens as _cost_tokens,
@@ -460,6 +460,18 @@ class ExportPanel(QWidget):
             setattr(self, f"{category.lower()}_only", only_check)
 
         tags = self._filter_box("Tags")
+        self.card_tag_filter = SelectedValues(TAG_OPTIONS, "Search tags...", option_tooltips=TAG_TOOLTIPS)
+        self.card_tag_filter.setToolTip("Filter by known or custom tags. Background, symbols, and extra cells have separate filters below.")
+        self.card_tag_filter.changed.connect(self._schedule_results_refresh)
+        self._labeled_filter("General tags", self.card_tag_filter, tags)
+        self.card_tag_all = QCheckBox("All")
+        self.card_tag_all.setToolTip("Require cards to have every selected general tag.")
+        self.card_tag_only = QCheckBox("Only")
+        self.card_tag_only.setToolTip("Require cards to have no other general tags besides the selected ones.")
+        self.card_tag_all.toggled.connect(self._schedule_results_refresh)
+        self.card_tag_only.toggled.connect(self._schedule_results_refresh)
+        tags.addWidget(self.card_tag_all)
+        tags.addWidget(self.card_tag_only)
         self.background_filter = self._autocomplete((tag[:-3] for card in self.cards for tag in _split_list(card.get("Tags", "")) if tag.endswith("_bg")), "Background sigil tag")
         self.background_filter.setToolTip("Show cards whose background modifier contains this text.")
         self.extra_cells_filter = OptionalSpinBox()
@@ -470,18 +482,12 @@ class ExportPanel(QWidget):
         self.symbol_2_filter = self._autocomplete((_display_name(row.get("Name", "")) for row in self.sigils), "Symbol 2")
         self.symbol_1_filter.setToolTip("Filter by a sigil used as a symbol.")
         self.symbol_2_filter.setToolTip("Filter by a sigil used as a symbol.")
-        for label, widget in (
-            ("Background", self.background_filter),
-            ("Extra Cells", self.extra_cells_filter),
-        ):
+        for label, widget in (("Background", self.background_filter), ("Extra Cells", self.extra_cells_filter)):
             self._labeled_filter(label, widget, tags)
         symbols = QWidget()
         symbol_layout = QHBoxLayout(symbols)
         symbol_layout.setContentsMargins(0, 0, 0, 0)
-        for label, widget in (
-            ("Symbol 1", self.symbol_1_filter),
-            ("Symbol 2", self.symbol_2_filter),
-        ):
+        for label, widget in (("Symbol 1", self.symbol_1_filter), ("Symbol 2", self.symbol_2_filter)):
             column = QVBoxLayout()
             column.setContentsMargins(0, 0, 0, 0)
             self._labeled_filter(label, widget, column)
@@ -497,13 +503,18 @@ class ExportPanel(QWidget):
         self.item_name_filter.setToolTip(f"Show {self.item_type.lower()} whose names contain this text.")
         self._labeled_filter(f"{self.item_type[:-1]} Name", self.item_name_filter, data)
         tags = self._filter_box("Tags")
-        self.item_tag_checks = {}
-        for tag in ITEM_TAG_FILTERS:
-            check = QCheckBox(tag.replace("_", " ").title())
-            check.setToolTip(f"Show only {self.item_type.lower()} with the {tag} tag.")
-            check.toggled.connect(self._schedule_results_refresh)
-            self.item_tag_checks[tag] = check
-            tags.addWidget(check)
+        self.item_tag_filter = SelectedValues(TAG_OPTIONS, "Search tags...", option_tooltips=TAG_TOOLTIPS)
+        self.item_tag_filter.setToolTip(f"Filter {self.item_type.lower()} by known or custom tags.")
+        self.item_tag_filter.changed.connect(self._schedule_results_refresh)
+        self._labeled_filter("Select tags", self.item_tag_filter, tags)
+        self.item_tag_all = QCheckBox("All")
+        self.item_tag_all.setToolTip(f"Require {self.item_type.lower()} to have every selected tag.")
+        self.item_tag_only = QCheckBox("Only")
+        self.item_tag_only.setToolTip(f"Require {self.item_type.lower()} to have no other tags besides the selected ones.")
+        self.item_tag_all.toggled.connect(self._schedule_results_refresh)
+        self.item_tag_only.toggled.connect(self._schedule_results_refresh)
+        tags.addWidget(self.item_tag_all)
+        tags.addWidget(self.item_tag_only)
 
     def _matches_values(self, values, selected, require_all, require_only):
         if not selected:
@@ -512,6 +523,12 @@ class ExportPanel(QWidget):
         requested = {value.casefold() for value in selected}
         has_requested = requested.issubset(normalized) if require_all else bool(requested & normalized)
         return has_requested and (not require_only or normalized.issubset(requested))
+
+    def _matches_item_row(self, row):
+        name_filter = self.item_name_filter.currentText().strip().casefold()
+        if name_filter and name_filter not in _display_name(row.get("Name", "")).casefold():
+            return False
+        return self._matches_values(_split_list(row.get("Tags", "")), self.item_tag_filter.selected, self.item_tag_all.isChecked(), self.item_tag_only.isChecked())
 
     def _filtered_rows(self):
         if self.item_type == "Cards":
@@ -547,6 +564,8 @@ class ExportPanel(QWidget):
                 if not filters_ok:
                     continue
                 parsed = parse_card_tags(row.get("Tags", ""))
+                if not self._matches_values(parsed["general_tags"], self.card_tag_filter.selected, self.card_tag_all.isChecked(), self.card_tag_only.isChecked()):
+                    continue
                 if self.background_filter.currentText().strip() and self.background_filter.currentText().strip().casefold() not in parsed["background"].casefold():
                     continue
                 if self.extra_cells_filter.lineEdit().text().strip():
@@ -568,9 +587,7 @@ class ExportPanel(QWidget):
             return rows
 
         source = self.sigils if self.item_type == "Sigils" else self.traits
-        name_filter = self.item_name_filter.currentText().strip().casefold()
-        selected_tags = {tag for tag, check in self.item_tag_checks.items() if check.isChecked()}
-        return [row for row in source if name_filter in _display_name(row.get("Name", "")).casefold() and selected_tags.issubset({tag.strip().lower() for tag in row.get("Tags", "").split(",") if tag.strip()})]
+        return [row for row in source if self._matches_item_row(row)]
 
     def _schedule_results_refresh(self, *_):
         self._refresh_timer.start()

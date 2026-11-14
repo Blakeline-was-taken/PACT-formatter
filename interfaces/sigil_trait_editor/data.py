@@ -4,22 +4,12 @@ import csv
 
 from model import DEFAULT_CONFIG
 from ..gui_helpers import ROOT, _join, _split
+from ..tag_data import TAG_OPTIONS as SIGIL_TAG_OPTIONS
 
 SIGIL_PATH = ROOT / DEFAULT_CONFIG["sigils_file_path"]
 TRAIT_PATH = ROOT / DEFAULT_CONFIG["traits_file_path"]
 SIGIL_ICON_DIR = ROOT / DEFAULT_CONFIG["assets_dir"] / "general_assets" / "sigils"
 CONDUIT_SIGIL_ICON_DIR = ROOT / DEFAULT_CONFIG["assets_dir"] / "general_assets" / "conduit_sigil_indicators"
-
-SIGIL_TAG_OPTIONS = [
-    "power_sigil",
-    "health_sigil",
-    "conduit_sigil",
-    "mox_green",
-    "mox_orange",
-    "mox_blue",
-    "mox_prism",
-]
-
 
 def normalize_sigil_name(name):
     """Convert a display name to the filename convention used for sigil icons."""

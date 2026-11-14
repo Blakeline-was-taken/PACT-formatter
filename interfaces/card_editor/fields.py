@@ -1,21 +1,24 @@
 """Reusable card-editor field widgets."""
 
-from PySide6.QtCore import QMimeData, QPoint, Qt, Signal
-from PySide6.QtGui import QDrag, QCursor
+from PySide6.QtCore import QMimeData, QPoint, QRegularExpression, Qt, Signal
+from PySide6.QtGui import QDrag, QCursor, QRegularExpressionValidator
 from PySide6.QtWidgets import (
     QComboBox,
     QFrame,
     QHBoxLayout,
+    QLabel,
     QLineEdit,
     QPushButton,
     QSizePolicy,
     QSpinBox,
     QVBoxLayout,
     QWidget,
+    QMessageBox,
 )
 
 from .data import COST_OPTIONS
 from ..gui_helpers import Gemification, NoWheelComboBox, set_widget_tooltip
+from ..tag_data import TAG_OPTIONS, TAG_TOOLTIPS, tag_tooltip
 
 
 class DraggableRow(QFrame):
@@ -269,11 +272,23 @@ class BasicRow(DraggableRow):
         self._add_remove_button(layout)
 
 
+class TagRow(DraggableRow):
+    """Non-editable tag row that displays its name as plain text."""
+
+    def __init__(self, value, parent=None):
+        super().__init__(parent)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(6, 0, 6, 0)
+        self.label = QLabel(value)
+        layout.addWidget(self.label, 1)
+        self._add_remove_button(layout)
+
+
 class ElementList(QWidget):
     """Search-and-list editor for ordered card fields."""
     changed = Signal()
 
-    def __init__(self, title, options, delimiter=", ", suggestions=True):
+    def __init__(self, title, options, delimiter=", ", suggestions=True, item_tooltips=None):
         """Build a reusable ordered-field editor.
 
         delimiter controls how the visible row order is serialized.
@@ -281,6 +296,7 @@ class ElementList(QWidget):
         """
         super().__init__()
         self.delimiter = delimiter
+        self.item_tooltips = {key.casefold(): value for key, value in (item_tooltips or {}).items()}
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         controls = QHBoxLayout()
@@ -289,6 +305,10 @@ class ElementList(QWidget):
             self.search.setEditable(True)
             self.search.setInsertPolicy(QComboBox.NoInsert)
             self.search.addItems(options)
+            for index, option in enumerate(options):
+                tooltip = self.item_tooltips.get(option.casefold())
+                if tooltip:
+                    self.search.setItemData(index, tooltip, Qt.ToolTipRole)
         self.search.setPlaceholderText(f"Input {title.lower()}...")
         self.search.setToolTip(f"Enter a {title.lower()} value to add it to the list.")
         controls.addWidget(self.search, 1)
@@ -310,11 +330,16 @@ class ElementList(QWidget):
         """Clear the add-entry control without changing its available options."""
         self.search.setCurrentText("") if isinstance(self.search, QComboBox) else self.search.clear()
 
+    def _new_basic_row(self, value):
+        """Create a row and apply optional value-specific help."""
+        row = BasicRow(value)
+        return row
+
     def add_item(self):
         """Append a basic text row from the add-entry control."""
         value = self._input_text().strip()
         if value:
-            row = BasicRow(value)
+            row = self._new_basic_row(value)
             row.changed.connect(self.changed)
             self.items.add_row(row)
             self._clear_input()
@@ -324,7 +349,7 @@ class ElementList(QWidget):
         """Replace the current rows with values loaded from a CSV field."""
         self.items.clear_rows()
         for value in values:
-            row = BasicRow(value)
+            row = self._new_basic_row(value)
             row.changed.connect(self.changed)
             self.items.add_row(row)
 
@@ -335,6 +360,29 @@ class ElementList(QWidget):
     def serialized(self):
         """Serialize ordered resources in the renderer's " + " format."""
         return self.delimiter.join(self.values())
+
+
+class TagList(ElementList):
+    """List of known or custom tags with tag-specific help."""
+
+    def __init__(self):
+        super().__init__("Tags", TAG_OPTIONS, item_tooltips=TAG_TOOLTIPS)
+        self.search.lineEdit().setValidator(QRegularExpressionValidator(QRegularExpression("[^,]*"), self.search.lineEdit()))
+        self.search.setToolTip("Choose a known tag or enter a custom tag. Add one tag per row; commas are reserved as separators.")
+
+    def _new_basic_row(self, value):
+        row = TagRow(value)
+        tooltip = tag_tooltip(value)
+        row.setToolTip(tooltip)
+        row.label.setToolTip(tooltip)
+        return row
+
+    def add_item(self):
+        value = self._input_text().strip()
+        if "," in value:
+            QMessageBox.warning(self, "Invalid tag", "Tags cannot contain commas. Add one tag per row.")
+            return
+        super().add_item()
 
 
 class CostList(ElementList):

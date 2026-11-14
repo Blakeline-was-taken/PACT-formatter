@@ -20,7 +20,6 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSizePolicy,
     QSpinBox,
-    QGridLayout,
     QSplitter,
     QVBoxLayout,
     QWidget,
@@ -32,27 +31,14 @@ from .data import (
     ASSET_PATH,
     CARD_FIELDS,
     CARDS_PATH,
-    TAG_OPTIONS,
     CardRepository,
     card_export_filenames,
     card_export_path,
     format_card_tags,
     parse_card_tags,
 )
-from .fields import CostList, ElementList, SigilList
+from .fields import CostList, ElementList, SigilList, TagList
 from ..gui_helpers import Gemification, NoWheelComboBox, ROOT, _split, _join, set_widget_tooltip
-
-_CARD_TAG_TOOLTIPS = {
-    "conduit_indicator": "Show the conduit overlay on the card's upper frame.",
-    "mox_indicator": "Show a Mox indicator on the card using the selected Mox gem tags.",
-    "mox_green": "Include a green gem in the card's Mox indicator.",
-    "mox_orange": "Include an orange gem in the card's Mox indicator.",
-    "mox_blue": "Include a blue gem in the card's Mox indicator.",
-    "mox_prism": "Include a prism gem in the card's Mox indicator.",
-    "gemified_vanilla": "Use the vanilla-style gemification rendering on the card.",
-    "conduit_sigil_indicator": "Show a standard Null Conduit sigil indicator if no specific conduit sigil is assigned.",
-}
-
 
 class CardEditor(QWidget):
     """Search, edit, preview, save, export, and delete card records."""
@@ -250,24 +236,15 @@ class CardEditor(QWidget):
         return row
 
     def _tag_editor(self):
-        """Build the fixed set of card tag toggles and extra-cell count."""
+        """Build the free-form tag list and dedicated special-tag controls."""
         widget = QWidget()
         widget.setToolTip("Appearance and layout tags used when rendering this card.")
         outer = QVBoxLayout(widget)
         outer.setContentsMargins(0, 0, 0, 0)
-        layout = QGridLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(4)
-        outer.addLayout(layout)
-
-        self.tag_checks = {}
-        for index, tag in enumerate(TAG_OPTIONS):
-            check = QPushButton(tag)
-            check.setToolTip(_CARD_TAG_TOOLTIPS.get(tag, "Toggle this card rendering tag."))
-            check.setCheckable(True)
-            check.toggled.connect(self._changed)
-            layout.addWidget(check, index // 4, index % 4)
-            self.tag_checks[tag] = check
+        self.tag_list = TagList()
+        self.tag_list.setToolTip("This is a custom tag that does nothing.")
+        self.tag_list.changed.connect(self._changed)
+        outer.addWidget(self.tag_list)
 
         background_row = QHBoxLayout()
         background_label = QLabel("Background")
@@ -441,10 +418,9 @@ class CardEditor(QWidget):
         self.fields["Tribes"].set_values(row.get("Tribes", "").replace(",", " ").split())
         self.fields["Token"].set_values(_split(row.get("Token", "")))
         self.fields["Credit"].set_values(_split(row.get("Credit", "")))
-        # Restore individual toggles and metadata encoded in the Tags column.
+        # Restore tags and special metadata encoded in the Tags column.
         self.extra_cell_amount.setValue(card_tags["extra_cells"])
-        for name, check in self.tag_checks.items():
-            check.setChecked(name in card_tags["tags"])
+        self.tag_list.set_values(card_tags["general_tags"])
         self.left_symbol.setCurrentText(card_tags["symbols"]["left"])
         self.right_symbol.setCurrentText(card_tags["symbols"]["right"])
         self.loading = False
@@ -475,7 +451,7 @@ class CardEditor(QWidget):
         # Keep the tag sequence consistent with existing editor output.
         row["Tags"] = format_card_tags(
             self.background.currentText(),
-            (name for name, check in self.tag_checks.items() if check.isChecked()),
+            self.tag_list.values(),
             self.left_symbol.currentText(),
             self.right_symbol.currentText(),
             self.extra_cell_amount.value(),
