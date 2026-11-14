@@ -182,7 +182,7 @@ def draw_rich_text(image, text, font, position, color, color_map, config,
             word_width = 0
 
     for kind, value, width, token_color in tokens:
-        if kind == "text" and not value.isspace():
+        if kind == "icon" or (kind == "text" and not value.isspace()):
             word_parts.append((kind, value, width, token_color))
             word_width += width
         else:
@@ -231,11 +231,11 @@ def draw_rich_text(image, text, font, position, color, color_map, config,
         for kind, value, width in line:
             if kind in ("word", "space"):
                 for token_kind, token_text, token_width, token_color in value:
-                    draw.text((int(cursor_x), int(y)), token_text, fill=token_color, font=font)
+                    if token_kind == "icon":
+                        image.alpha_composite(token_text, (int(cursor_x), int(y)))
+                    else:
+                        draw.text((int(cursor_x), int(y)), token_text, fill=token_color, font=font)
                     cursor_x += token_width
-            elif kind == "icon":
-                image.alpha_composite(value, (int(cursor_x), int(y)))
-                cursor_x += width
         y += line_height
 
     return max(line_widths, default=0), len(lines) * line_height, image

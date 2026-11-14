@@ -46,7 +46,10 @@ def parse_stat_gemification(value):
     return gems, effect, stat_value
 
 
-def get_card_asset(asset_name, default_folder, temple, tier=None, bg_modifier=None, fallback_tier=DEFAULT_CONFIG["default_tier"]):
+def get_card_asset(asset_name, default_folder, temple, tier=None, bg_modifier=None, fallback_tier=DEFAULT_CONFIG["default_tier"], color_tier=None):
+    if color_tier is None:
+        color_tier = tier
+
     prefixes = []
     if tier and bg_modifier:
         prefixes.append(f"{tier}_{bg_modifier}_")
@@ -60,11 +63,21 @@ def get_card_asset(asset_name, default_folder, temple, tier=None, bg_modifier=No
     for prefix in prefixes:
         for directory in directories:
             try:
-                return apply_temple_colors(Image.open(directory / f"{prefix}{asset_name}.png"), temple, tier, bg_modifier)
+                image = Image.open(directory / f"{prefix}{asset_name}.png")
             except (FileNotFoundError, PermissionError):
                 continue
+
+            try:
+                return apply_temple_colors(image, temple, color_tier, bg_modifier)
+            except (FileNotFoundError, PermissionError):
+                if fallback_tier and fallback_tier != color_tier:
+                    try:
+                        return apply_temple_colors(image, temple, fallback_tier, bg_modifier)
+                    except (FileNotFoundError, PermissionError):
+                        continue
+                continue
     
-    return get_card_asset(asset_name, default_folder, temple, fallback_tier, bg_modifier, fallback_tier)
+    return get_card_asset(asset_name, default_folder, temple, fallback_tier, bg_modifier, fallback_tier, color_tier)
 
 def get_cardback(temple, tier, bg_modifier=None, fallback_tier=None):
     return get_card_asset("bg", "cardbacks", temple, tier, bg_modifier, fallback_tier)
