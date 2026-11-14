@@ -27,7 +27,14 @@ from PySide6.QtWidgets import (
 )
 
 from model import DEFAULT_CONFIG, sigils
-from ..gui_helpers import ColorPickerButton, NoWheelComboBox, NoWheelSpinBox, ROOT, create_card_preview
+from ..gui_helpers import (
+    ColorPickerButton,
+    NoWheelComboBox,
+    NoWheelSpinBox,
+    ROOT,
+    create_card_preview,
+    set_widget_tooltip,
+)
 from .data import (
     COORDINATE_FIELDS,
     SUBSECTION_FIELDS,
@@ -39,6 +46,96 @@ from .data import (
     target_layer,
     write_config,
 )
+
+_SECTION_TOOLTIPS = {
+    "Formatting": "Choose which card elements and rendering layouts are enabled.",
+    "Text": "Adjust fonts, text sizes, colors, wrapping limits, and text placement.",
+    "Indicators": "Position tribe icons, decorative symbols, conduit/Mox indicators, and extra cells.",
+    "Cost": "Position card costs and adjust spacing between resource icons.",
+    "Sigils": "Set sigil sizing, available layout space, and trait spacing.",
+    "Gemification": "Position gemified stats and costs, and tune gemified sigil layouts.",
+    "Sigil Conditional": "Adjust the layout and labels used by conditional sigil styles.",
+    "Rich Text Colors": "Create named colors used by rich-text markup in rendered text.",
+}
+
+_SUBSECTION_TOOLTIPS = {
+    "Blood": "Adjust spacing between blood-cost icons.",
+    "Bones": "Adjust spacing between bone-cost icons.",
+    "Energy": "No additional energy-cost spacing values are available.",
+    "Gems": "Adjust spacing between gem-cost icons.",
+    "Asterisk": "Adjust spacing between asterisk-cost icons.",
+    "Cell": "Position sigils displayed in cell conditionals and set size thresholds.",
+    "Latch": "Position latch sigils and heads, and set sigil size thresholds.",
+    "Arcane": "Position arcane dividers and edit their label, font, and colors.",
+    "Tribal": "Position tribal dividers and edit their label, font, and colors.",
+    "Hint": "Choose the palette color used by hint-style sigils.",
+}
+
+_FIELD_TOOLTIPS = {
+    "font": "Font file used for rendered text; options come from data/fonts.",
+    "write_card_metadata": "Show card metadata such as temple, tier, and tribes.",
+    "write_art_credit": "Show the card's artist credit.",
+    "show_power_sigil": "Replace the power number with its tagged sigil when applicable.",
+    "show_health_sigil": "Replace the health number with its tagged sigil when applicable.",
+    "allow_colored_sigils": "Keep native sigil colors instead of using monochrome outline variants.",
+    "colorless_symbols": "Use colorless outline variants for the card's decorative symbols.",
+    "display_tribe_icons": "Show tribe icons on the card's upper-right border.",
+    "show_conduit_sigil_indicators": "Show conduit sigil indicators when matching art is available.",
+    "center_card_name": "Center the card title instead of anchoring it at the left border.",
+    "traits_at_bottom": "Pin traits to the bottom of the layout instead of stacking them under sigils.",
+    "allow_card_bottom_removal": "Allow the renderer to remove the bottom card area when needed.",
+    "allow_default_formatting": "Allow the full-size primary sigil layout.",
+    "allow_shortened_formatting": "Allow the compact sigil layout as a fallback when content overflows.",
+    "allow_base_game_display": "Allow the final fallback layout with standalone sigil icons and no descriptions.",
+    "power_center": "Shared X/Y center point for the power value or its replacement sigil, in template pixels.",
+    "health_center": "Shared X/Y center point for the health value or its replacement sigil, in template pixels.",
+    "left_symbol": "X/Y position of the decorative symbol at the card's bottom-left, in template pixels.",
+    "right_symbol": "X/Y position of the decorative symbol at the card's bottom-right, in template pixels.",
+    "arcane_text": "Label shown in the arcane conditional divider.",
+    "tribal_text": "Label shown in the tribal conditional divider.",
+}
+
+
+def _field_tooltip(key):
+    """Describe a template setting using its meaning or its measurement role."""
+    if key in _FIELD_TOOLTIPS:
+        return _FIELD_TOOLTIPS[key]
+    subject = key.replace("_", " ")
+    if key.endswith("_font_size"):
+        return f"Font size in pixels for {subject.removesuffix(' font size')}."
+    if key.endswith("_color_index"):
+        return f"1-based index into the active color palette for {subject.removesuffix(' color index')}."
+    if key.endswith("_max_width"):
+        return f"Maximum text width in template pixels for {subject.removesuffix(' max width')}."
+    if key.endswith("_max_height"):
+        return f"Height threshold in template pixels for {subject.removesuffix(' max height')}."
+    if key.endswith("_horizontal_center"):
+        return f"Horizontal center coordinate in template pixels for {subject.removesuffix(' horizontal center')}."
+    if key.endswith("_top_border") or key.endswith("_text_y"):
+        return f"Vertical position in template pixels for {subject.removesuffix(' top border').removesuffix(' text y')}."
+    if key.endswith("_bottom_border"):
+        return f"Bottom-edge position in template pixels for {subject.removesuffix(' bottom border')}."
+    if key.endswith("_left_border"):
+        return f"Left-edge or horizontal position in template pixels for {subject.removesuffix(' left border')}."
+    if key.endswith("_right_border"):
+        return f"Right-edge or horizontal boundary in template pixels for {subject.removesuffix(' right border')}."
+    if key.endswith("_center"):
+        return f"Center point in template pixels for {subject.removesuffix(' center')}."
+    if key.endswith("_vertical_spacing"):
+        return f"Vertical gap in template pixels for {subject.removesuffix(' vertical spacing')}."
+    if key.endswith("_top_displacement"):
+        return f"Vertical offset from the top in template pixels for {subject.removesuffix(' top displacement')}."
+    if key.endswith("_bottom_displacement"):
+        return f"Vertical offset from the bottom in template pixels for {subject.removesuffix(' bottom displacement')}."
+    if key.endswith("_vertical_displacement"):
+        return f"Vertical offset in template pixels for {subject.removesuffix(' vertical displacement')}."
+    if key.endswith("_right_displacement") or key.endswith("_displacement"):
+        return f"Placement offset in template pixels for {subject.removesuffix(' right displacement').removesuffix(' displacement')}."
+    if key.endswith("_img_scale"):
+        return "Percentage scale applied to the rendered sigil image."
+    if key.endswith("_img_space") or key.endswith("_space"):
+        return f"Available layout space in template pixels for {subject.removesuffix(' img space').removesuffix(' space')}."
+    return f"Adjusts {subject} in the active template configuration."
 
 
 class TemplateEditor(QWidget):
@@ -104,10 +201,14 @@ class TemplateEditor(QWidget):
         self.temple_selector = self._make_selector("Temple", self._temple_options)
         self.tier_selector = self._make_selector("Tier", self._tier_options)
         self.modifier_selector = self._make_selector("Background modifier", self._modifier_options)
+        self.temple_selector.setToolTip("Choose a temple layer. Leave blank to use the default layer.")
+        self.tier_selector.setToolTip("Choose a tier layer. Leave blank to use the default layer.")
+        self.modifier_selector.setToolTip("Choose a background-modifier layer. Leave blank to use the default layer.")
         for selector in (self.temple_selector, self.tier_selector, self.modifier_selector):
             layout.addWidget(selector, 1)
 
         load = QPushButton("Load")
+        load.setToolTip("Load the effective settings for the selected temple, tier, and background modifier.")
         load.clicked.connect(self._load_requested)
         layout.addWidget(load)
         return box
@@ -148,6 +249,7 @@ class TemplateEditor(QWidget):
             button.setChecked(False)
             button.setObjectName("templateSectionButton")
             button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+            button.setToolTip(_SECTION_TOOLTIPS.get(section_name, "Open this group of template settings."))
             button.clicked.connect(lambda checked, name=section_name: self._toggle_section(name, checked))
             body_layout.addWidget(button)
             section_body = QWidget()
@@ -171,6 +273,7 @@ class TemplateEditor(QWidget):
                     sub_button = QPushButton(subsection_name)
                     sub_button.setCheckable(True)
                     sub_button.setObjectName("templateSubsectionButton")
+                    sub_button.setToolTip(_SUBSECTION_TOOLTIPS.get(subsection_name, f"Open {subsection_name.lower()} settings."))
                     sub_button.clicked.connect(lambda checked=False, section=section_name, name=subsection_name: self._open_subsection(section, name))
                     subsection_nav_layout.addWidget(sub_button)
                     self._subsection_buttons[section_name][subsection_name] = sub_button
@@ -199,6 +302,9 @@ class TemplateEditor(QWidget):
         outer.addWidget(scroll, 1)
 
         restore = QPushButton("Restore Default Settings")
+        restore.setToolTip(
+            "Reset built-in defaults in the default layer, or remove overrides from the selected layer."
+        )
         restore.clicked.connect(self._restore_defaults)
         outer.addWidget(restore)
         return container
@@ -215,16 +321,27 @@ class TemplateEditor(QWidget):
                 coordinate_layout = QHBoxLayout(field_widget)
                 coordinate_layout.setContentsMargins(0, 0, 0, 0)
                 coordinates = []
+                tooltip = _field_tooltip(key)
                 for axis, value in zip(("X", "Y"), default_value):
-                    coordinate_layout.addWidget(QLabel(axis))
+                    axis_label = QLabel(axis)
+                    axis_label.setToolTip(f"{tooltip} {axis} is the {'horizontal' if axis == 'X' else 'vertical'} coordinate.")
+                    coordinate_layout.addWidget(axis_label)
                     spin = self._make_number_control(key, value)
+                    spin.setToolTip(f"{tooltip} {axis} is the {'horizontal' if axis == 'X' else 'vertical'} coordinate.")
                     coordinate_layout.addWidget(spin, 1)
                     coordinates.append(spin)
                 control = tuple(coordinates)
-                form.addRow(key.replace("_", " ").title(), field_widget)
+                set_widget_tooltip(field_widget, tooltip)
+                label = QLabel(key.replace("_", " ").title())
+                label.setToolTip(tooltip)
+                form.addRow(label, field_widget)
             else:
                 control = self._make_field_control(key, default_value)
-                form.addRow(key.replace("_", " ").title(), control)
+                tooltip = _field_tooltip(key)
+                set_widget_tooltip(control, tooltip)
+                label = QLabel(key.replace("_", " ").title())
+                label.setToolTip(tooltip)
+                form.addRow(label, control)
             self._field_controls[key] = control
         parent_layout.addLayout(form)
 
@@ -237,14 +354,17 @@ class TemplateEditor(QWidget):
         self.color_search.setEditable(True)
         self.color_search.setInsertPolicy(QComboBox.NoInsert)
         self.color_search.setPlaceholderText("Search colors")
+        self.color_search.setToolTip("Search for a named rich-text color to edit.")
         self.color_search.activated.connect(self._select_color_from_search)
         self.color_search.lineEdit().returnPressed.connect(self._select_color_from_search_text)
         self.color_search.lineEdit().textEdited.connect(lambda text: self._update_color_remove_button())
         search_row.addWidget(self.color_search, 1)
         create = QPushButton("Create new")
+        create.setToolTip("Create a named rich-text color with an initial black RGB entry.")
         create.clicked.connect(self._create_color)
         search_row.addWidget(create)
         remove_color = QPushButton("Remove")
+        remove_color.setToolTip("Delete the selected rich-text color.")
         remove_color.clicked.connect(self._remove_selected_color)
         remove_color.setEnabled(False)
         search_row.addWidget(remove_color)
@@ -253,6 +373,7 @@ class TemplateEditor(QWidget):
 
         form = QFormLayout()
         self.color_name = QLineEdit()
+        self.color_name.setToolTip("Name used by rich-text color markup in card and item text.")
         self.color_name.textChanged.connect(self._color_editor_changed)
         form.addRow("Name", self.color_name)
         parent_layout.addLayout(form)
@@ -261,6 +382,7 @@ class TemplateEditor(QWidget):
         self.color_entries_layout.setContentsMargins(0, 0, 0, 0)
         parent_layout.addLayout(self.color_entries_layout)
         add_entry = QPushButton("Add palette color")
+        add_entry.setToolTip("Add another RGB color or color-palette index to this named color.")
         add_entry.clicked.connect(lambda: self._add_color_entry())
         parent_layout.addWidget(add_entry)
 
@@ -356,15 +478,18 @@ class TemplateEditor(QWidget):
         type_selector = NoWheelComboBox()
         type_selector.addItems(["RGB color", "Color index"])
         type_selector.setCurrentText(entry_type)
+        type_selector.setToolTip("Choose an explicit RGB color or an index from the active temple palette.")
         layout.addWidget(type_selector)
 
         index = NoWheelSpinBox()
         index.setRange(1, 1_000_000)
+        index.setToolTip("1-based index into the active color palette.")
         red = NoWheelSpinBox()
         green = NoWheelSpinBox()
         blue = NoWheelSpinBox()
         for control in (red, green, blue):
             control.setRange(0, 255)
+            control.setToolTip("RGB channel value from 0 to 255.")
         rgb_widget = QWidget()
         rgb_layout = QHBoxLayout(rgb_widget)
         rgb_layout.setContentsMargins(0, 0, 0, 0)
@@ -385,6 +510,7 @@ class TemplateEditor(QWidget):
         layout.addWidget(rgb_widget, 1)
 
         remove = QPushButton("Remove")
+        remove.setToolTip("Remove this color from the named palette.")
         remove.clicked.connect(lambda: self._remove_color_entry(row))
         layout.addWidget(remove)
         record = {
@@ -568,6 +694,7 @@ class TemplateEditor(QWidget):
         self.preview.setAlignment(Qt.AlignCenter)
         self.preview.setMinimumSize(320, 420)
         self.preview.setStyleSheet("background: #e8edf5;")
+        self.preview.setToolTip("Live sample card rendered with the active settings. It is not an exported card.")
         layout.addWidget(self.preview, 1)
 
         preview_lines = QHBoxLayout()
@@ -576,6 +703,7 @@ class TemplateEditor(QWidget):
         layout.addLayout(preview_lines)
 
         save = QPushButton("Save")
+        save.setToolTip("Save the current settings to the selected configuration layer.")
         save.clicked.connect(self._save)
         layout.addWidget(save)
         self._preview_timer = QTimer(self)
@@ -585,10 +713,13 @@ class TemplateEditor(QWidget):
 
     def _make_preview_line_control(self, label, layout):
         """Add a bounded line-count control to the preview options."""
-        layout.addWidget(QLabel(label))
+        line_label = QLabel(label)
+        line_label.setToolTip(f"Set how many sample {label.lower()} the preview card should display.")
+        layout.addWidget(line_label)
         control = QSpinBox()
         control.setRange(1, 8)
         control.setValue(1)
+        set_widget_tooltip(control, f"Set how many sample {label.lower()} the preview card should display.")
         control.valueChanged.connect(self._request_preview)
         layout.addWidget(control, 1)
         return control

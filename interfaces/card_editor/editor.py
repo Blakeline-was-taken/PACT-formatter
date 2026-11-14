@@ -40,7 +40,18 @@ from .data import (
     parse_card_tags,
 )
 from .fields import CostList, ElementList, SigilList
-from ..gui_helpers import Gemification, NoWheelComboBox, ROOT, _split, _join
+from ..gui_helpers import Gemification, NoWheelComboBox, ROOT, _split, _join, set_widget_tooltip
+
+_CARD_TAG_TOOLTIPS = {
+    "conduit_indicator": "Show the conduit overlay on the card's upper frame.",
+    "mox_indicator": "Show a Mox indicator on the card using the selected Mox gem tags.",
+    "mox_green": "Include a green gem in the card's Mox indicator.",
+    "mox_orange": "Include an orange gem in the card's Mox indicator.",
+    "mox_blue": "Include a blue gem in the card's Mox indicator.",
+    "mox_prism": "Include a prism gem in the card's Mox indicator.",
+    "gemified_vanilla": "Use the vanilla-style gemification rendering on the card.",
+    "conduit_sigil_indicator": "Show a standard Null Conduit sigil indicator if no specific conduit sigil is assigned.",
+}
 
 
 class CardEditor(QWidget):
@@ -99,14 +110,17 @@ class CardEditor(QWidget):
         self.search = NoWheelComboBox()
         self.search.setEditable(True)
         self.search.setPlaceholderText("Search cards by name...")
+        self.search.setToolTip("Search existing cards by name, then load one to edit.")
         self.search.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.search.lineEdit().textEdited.connect(self._filter_cards)
         layout.addWidget(self.search, 1)
         edit = QPushButton("Edit")
         edit.setText("Load")
+        edit.setToolTip("Load the card currently selected in the search field.")
         edit.clicked.connect(self._search_activated)
         layout.addWidget(edit)
         new = QPushButton("+ New card")
+        new.setToolTip("Clear the form and start a new card record.")
         new.clicked.connect(self._new_card)
         layout.addWidget(new)
         self._refresh_search()
@@ -135,6 +149,7 @@ class CardEditor(QWidget):
         # Basic identity fields and the card's template selectors.
         for name in ("Card Name", "Flavor Text"):
             edit = QLineEdit()
+            edit.setToolTip("Name shown on the card." if name == "Card Name" else "Narrative text shown on the card.")
             edit.textChanged.connect(self._changed)
             self.fields[name] = edit
             form.addRow(name, edit)
@@ -142,6 +157,9 @@ class CardEditor(QWidget):
         self.temple = self._suggested_field(self._unique_column_values("Temple"))
         self.tier = self._suggested_field(self._unique_column_values("Tier"))
         self.background = self._suggested_field(self._unique_background_modifiers())
+        self.temple.setToolTip("Temple used to choose the card's assets and template.")
+        self.tier.setToolTip("Tier used to choose the card's assets and template.")
+        self.background.setToolTip("Optional background modifier used to select assets and template.")
         self.fields["Temple"] = self.temple
         self.fields["Tier"] = self.tier
         self.fields["Background"] = self.background
@@ -150,7 +168,9 @@ class CardEditor(QWidget):
 
         self.art = QLineEdit()
         self.art.setReadOnly(True)
+        self.art.setToolTip("Card-art image filename from the general card-art asset folder.")
         choose = QPushButton("Choose file...")
+        choose.setToolTip("Choose the image used as this card's artwork.")
         choose.clicked.connect(self._choose_art)
         art_row = QHBoxLayout()
         art_row.addWidget(self.art, 1)
@@ -161,13 +181,16 @@ class CardEditor(QWidget):
         self.power = self._stat_editor("Power", form)
         self.health = self._stat_editor("Health", form)
         self.costs = CostList()
+        set_widget_tooltip(self.costs, "Build the card's cost by adding resources.")
         self.costs.changed.connect(self._changed)
         form.addRow("Cost", self.costs)
         sigil_options = self._load_names("sigils.csv", "Name") + ["TRIBAL", "RAINBOW"]
         self.sigils = SigilList(sigil_options)
+        set_widget_tooltip(self.sigils, "Add sigils, or \"TRIBAL\"/\"ARCANE\" for the non-sigil-specific conditionals. Each row can have a conditional.")
         self.sigils.changed.connect(self._changed)
         form.addRow("Sigils", self.sigils)
         self.traits = ElementList("Traits", self._load_names("traits.csv", "Name"))
+        set_widget_tooltip(self.traits, "Add traits.")
         self.traits.changed.connect(self._changed)
         form.addRow("Traits", self.traits)
         tribes = self._unique_tribes()
@@ -175,6 +198,12 @@ class CardEditor(QWidget):
             options = tribes if name == "Tribes" else self._unique_column_values("Credit")
             widget = ElementList(name, options, suggestions=name != "Token")
             widget.delimiter = " " if name == "Tribes" else ", "
+            descriptions = {
+                "Tribes": "Tribes displayed with tribe icons.",
+                "Token": "Values inserted in order wherever a sigil or trait description contains the TOKEN keyword.",
+                "Credit": "Artist attributions shown at the bottom of the card.",
+            }
+            set_widget_tooltip(widget, descriptions[name])
             widget.changed.connect(self._changed)
             self.fields[name] = widget
             form.addRow(name, widget)
@@ -188,6 +217,7 @@ class CardEditor(QWidget):
         outer.addWidget(scroll)
         delete = QPushButton("Delete card")
         delete.setObjectName("dangerButton")
+        delete.setToolTip("Delete this card's data record.")
         delete.clicked.connect(self._delete_card)
         outer.addWidget(delete)
         return container
@@ -199,11 +229,14 @@ class CardEditor(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         value = QLineEdit()
         value.setPlaceholderText("Number...")
+        value.setToolTip(f"Base {name.lower()} value, or the text value used for gemification.")
         value.textChanged.connect(self._changed)
         layout.addWidget(value, 1)
         toggle = QPushButton("Gemified")
+        toggle.setToolTip(f"Enable gemification controls for the card's {name.lower()}.")
         toggle.setCheckable(True)
         gem = Gemification(True)
+        set_widget_tooltip(gem, "Choose the gem color and optional gemification text for this stat.")
         gem.setVisible(False)
         toggle.toggled.connect(gem.setVisible)
         toggle.toggled.connect(self._changed)
@@ -219,6 +252,7 @@ class CardEditor(QWidget):
     def _tag_editor(self):
         """Build the fixed set of card tag toggles and extra-cell count."""
         widget = QWidget()
+        widget.setToolTip("Appearance and layout tags used when rendering this card.")
         outer = QVBoxLayout(widget)
         outer.setContentsMargins(0, 0, 0, 0)
         layout = QGridLayout()
@@ -229,25 +263,31 @@ class CardEditor(QWidget):
         self.tag_checks = {}
         for index, tag in enumerate(TAG_OPTIONS):
             check = QPushButton(tag)
+            check.setToolTip(_CARD_TAG_TOOLTIPS.get(tag, "Toggle this card rendering tag."))
             check.setCheckable(True)
             check.toggled.connect(self._changed)
             layout.addWidget(check, index // 4, index % 4)
             self.tag_checks[tag] = check
 
         background_row = QHBoxLayout()
-        background_row.addWidget(QLabel("Background"))
+        background_label = QLabel("Background")
+        background_label.setToolTip("Optional background modifier used to select assets and template.")
+        background_row.addWidget(background_label)
         background_row.addWidget(self.background, 1)
         outer.addLayout(background_row)
 
         self.extra_cell_amount = QSpinBox()
         self.extra_cell_amount.setRange(0, 99)
         self.extra_cell_amount.setPrefix("Extra cells: ")
+        set_widget_tooltip(self.extra_cell_amount, "Number of extra energy cells to show.")
         self.extra_cell_amount.valueChanged.connect(self._changed)
         outer.addWidget(self.extra_cell_amount)
 
         symbol_options = self._load_names("sigils.csv", "Name")
         self.left_symbol = self._suggested_field(symbol_options)
         self.right_symbol = self._suggested_field(symbol_options)
+        self.left_symbol.setToolTip("Sigil symbol shown at the bottom-left of the card.")
+        self.right_symbol.setToolTip("Sigil symbol shown at the bottom-right of the card.")
         left_symbol_row = QHBoxLayout()
         left_symbol_row.addWidget(QLabel("Left symbol"))
         left_symbol_row.addWidget(self.left_symbol, 1)
@@ -269,11 +309,14 @@ class CardEditor(QWidget):
         self.preview.setAlignment(Qt.AlignCenter)
         self.preview.setMinimumSize(300, 420)
         self.preview.setStyleSheet("background: #e8edf5;")
+        self.preview.setToolTip("Live card preview. Changes appear here before you save or export.")
         layout.addWidget(self.preview, 1)
         buttons = QHBoxLayout()
         save = QPushButton("Save")
+        save.setToolTip("Save the current card data without exporting an image.")
         save.clicked.connect(self._save)
         save_export = QPushButton("Save and Export")
+        save_export.setToolTip("Save the current card data and render its image.")
         save_export.clicked.connect(lambda: self._save(True))
         buttons.addWidget(save)
         buttons.addWidget(save_export)

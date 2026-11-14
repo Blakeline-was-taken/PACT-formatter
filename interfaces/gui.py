@@ -20,6 +20,12 @@ class EditorWindow(QMainWindow):
         ("Sigil/Trait Editor", None),
         ("Template Editor", None),
     )
+    TAB_TOOLTIPS = {
+        "Export Panel": "Filter items, select them, and export cards, sigils, or traits.",
+        "Card Editor": "Create and edit card data, preview cards, and export individual cards.",
+        "Sigil/Trait Editor": "Create and edit sigils and traits, their descriptions, icons, and tags.",
+        "Template Editor": "Adjust rendering settings for temple, tier, and background combinations.",
+    }
 
     def __init__(self):
         """Set up the window shell and its initial status message."""
@@ -80,7 +86,8 @@ class EditorWindow(QMainWindow):
                     "Sigil/Trait Editor": SigilTraitEditor,
                     "Template Editor": TemplateEditor,
                 }[name]
-            self.tabs.addTab(page_factory(), name)
+            index = self.tabs.addTab(page_factory(), name)
+            self.tabs.setTabToolTip(index, self.TAB_TOOLTIPS[name])
         self.tabs.setCurrentIndex(0)
 
     def _tab_changed(self, index):
@@ -167,6 +174,10 @@ def _apply_style(app):
         #emptyState { color: #334155; font-size: 16px; }
         #mutedText { color: #68758a; }
         QStatusBar { background: #edf1f7; color: #586579; }
+        QToolTip {
+            background: #ffffff; color: #202938; border: 1px solid #b8c4d4;
+            border-radius: 4px; padding: 5px 7px;
+        }
         """
     )
 

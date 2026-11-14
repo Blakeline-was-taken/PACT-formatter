@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from .data import COST_OPTIONS
-from ..gui_helpers import Gemification, NoWheelComboBox
+from ..gui_helpers import Gemification, NoWheelComboBox, set_widget_tooltip
 
 
 class DraggableRow(QFrame):
@@ -33,6 +33,7 @@ class DraggableRow(QFrame):
         self.setFrameShape(QFrame.NoFrame)
         self.setMouseTracking(True)
         self.setCursor(QCursor(Qt.OpenHandCursor))
+        self.setToolTip("Drag this row to reorder it. Use X to remove it.")
         self.setStyleSheet(
             "QFrame#editorRow { background-color: #eef1f5; border: 1px solid #d9dee6; "
             "border-left: 4px solid #c4cbd5; border-radius: 4px; }"
@@ -210,8 +211,10 @@ class CostRow(DraggableRow):
         layout.setContentsMargins(6, 0, 6, 0)
         self.label = QLineEdit(resource)
         self.label.setFrame(False)
+        self.label.setToolTip("Cost resource name.")
         self.label.textChanged.connect(self.changed)
         self.amount = QSpinBox()
+        set_widget_tooltip(self.amount, "Amount of this resource.")
         self.amount.setRange(0, 99)
         self.amount.setValue(amount)
         self.amount.setFixedWidth(78)
@@ -233,9 +236,11 @@ class SigilRow(DraggableRow):
         layout.setContentsMargins(6, 0, 6, 0)
         self.label = QLineEdit(name)
         self.label.setFrame(False)
+        self.label.setToolTip("Sigil name.")
         self.label.textChanged.connect(self.changed)
         self.conditional = NoWheelComboBox()
         self.conditional.addItems(["None", "Cell", "Latch", "Hint", "Gemified"])
+        self.conditional.setToolTip("Apply a conditional to this sigil.")
         self.conditional.setCurrentText(conditional)
         self.gemification = Gemification(False)
         self.gemification.setVisible(conditional == "Gemified")
@@ -258,6 +263,7 @@ class BasicRow(DraggableRow):
         layout.setContentsMargins(6, 0, 6, 0)
         self.label = QLineEdit(value)
         self.label.setFrame(False)
+        self.label.setToolTip("Entry value. Drag its row to change the order.")
         self.label.textChanged.connect(self.changed)
         layout.addWidget(self.label, 1)
         self._add_remove_button(layout)
@@ -284,8 +290,10 @@ class ElementList(QWidget):
             self.search.setInsertPolicy(QComboBox.NoInsert)
             self.search.addItems(options)
         self.search.setPlaceholderText(f"Input {title.lower()}...")
+        self.search.setToolTip(f"Enter a {title.lower()} value to add it to the list.")
         controls.addWidget(self.search, 1)
         add = QPushButton("+ Add")
+        add.setToolTip(f"Add the entered {title.lower()} value.")
         add.clicked.connect(self.add_item)
         controls.addWidget(add)
         layout.addLayout(controls)
@@ -336,6 +344,7 @@ class CostList(ElementList):
         """Create a cost editor using renderer-compatible cost segments."""
         super().__init__("Costs", COST_OPTIONS, delimiter=" + ")
         self.gemified = QPushButton("Gemified")
+        self.gemified.setToolTip("Apply gemification to the cost.")
         self.gemified.setCheckable(True)
         self.gemification = Gemification(True)
         self.gemification.setVisible(False)

@@ -32,6 +32,14 @@ def open_folder(path):
     return QDesktopServices.openUrl(QUrl.fromLocalFile(str(Path(path).resolve())))
 
 
+def set_widget_tooltip(widget, text):
+    """Set a tooltip on a widget and any of its descendants without replacing specific help."""
+    widget.setToolTip(text)
+    for child in widget.findChildren(QWidget):
+        if not child.toolTip():
+            child.setToolTip(text)
+
+
 def create_card_preview(
     card_name="",
     art_file="",
@@ -88,6 +96,13 @@ def _join(values):
 class NoWheelComboBox(QComboBox):
     """Editable selector that lets the parent scroll area consume mouse wheels."""
 
+    def setToolTip(self, text):
+        """Show the selector tooltip when the pointer is over its editable text field."""
+        super().setToolTip(text)
+        line_edit = self.lineEdit()
+        if line_edit is not None:
+            line_edit.setToolTip(text)
+
     def wheelEvent(self, event):
         """Leave wheel scrolling to the enclosing scroll area."""
         event.ignore()
@@ -95,6 +110,11 @@ class NoWheelComboBox(QComboBox):
 
 class NoWheelSpinBox(QSpinBox):
     """Numeric selector that leaves wheel scrolling to the parent widget."""
+
+    def setToolTip(self, text):
+        """Show the spin-box tooltip when the pointer is over its embedded text field."""
+        super().setToolTip(text)
+        self.lineEdit().setToolTip(text)
 
     def wheelEvent(self, event):
         """Leave wheel scrolling to the enclosing scroll area."""
@@ -111,6 +131,7 @@ class ColorPickerButton(QPushButton):
         super().__init__(parent)
         self.label = label
         self._color = (0, 0, 0)
+        self.setToolTip("Choose an RGB color. The swatch shows the current value.")
         self.clicked.connect(self._choose_color)
         self.set_color(color)
 
@@ -166,6 +187,7 @@ class Gemification(QWidget):
         if with_text:
             self.effect = QLineEdit()
             self.effect.setPlaceholderText("Gemification text")
+            self.effect.setToolTip("Optional text encoded with the selected gems.")
             self.effect.textChanged.connect(self.changed)
             layout.addWidget(self.effect, 1)
         else:
@@ -176,6 +198,7 @@ class Gemification(QWidget):
         self.checks = {}
         for gem in ("green", "blue", "orange", "prism"):
             check = QPushButton(gem.title())
+            check.setToolTip("Select this gem for the value. Prism is exclusive.")
             check.setCheckable(True)
             check.toggled.connect(self._toggle)
             toggles.addWidget(check)

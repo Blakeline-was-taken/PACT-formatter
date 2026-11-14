@@ -21,7 +21,16 @@ from PySide6.QtWidgets import (
 )
 
 from model import DEFAULT_CONFIG, sigils
-from ..gui_helpers import Gemification, NoWheelComboBox, ROOT, _split, _join, create_card_preview, safe_filename
+from ..gui_helpers import (
+    Gemification,
+    NoWheelComboBox,
+    ROOT,
+    _split,
+    _join,
+    create_card_preview,
+    safe_filename,
+    set_widget_tooltip,
+)
 from .data import (
     CONDUIT_SIGIL_ICON_DIR,
     SIGIL_ICON_DIR,
@@ -29,6 +38,16 @@ from .data import (
     SigilTraitRepository,
     normalize_sigil_name,
 )
+
+_SIGIL_TAG_TOOLTIPS = {
+    "power_sigil": "Replace a card's power number with this sigil when enabled by the template.",
+    "health_sigil": "Replace a card's health number with this sigil when enabled by the template.",
+    "conduit_sigil": "Use this sigil's matching conduit indicator artwork when available.",
+    "mox_green": "Add a green gem to the Mox indicator when this sigil is on a card with one.",
+    "mox_orange": "Add an orange gem to the Mox indicator when this sigil is on a card with one.",
+    "mox_blue": "Add a blue gem to the Mox indicator when this sigil is on a card with one.",
+    "mox_prism": "Add a prism gem to the Mox indicator when this sigil is on a card with one.",
+}
 
 
 class SigilTraitEditor(QWidget):
@@ -73,21 +92,25 @@ class SigilTraitEditor(QWidget):
         layout = QHBoxLayout(box)
         self.category = NoWheelComboBox()
         self.category.addItems(["Sigils", "Traits"])
+        self.category.setToolTip("Choose which collection to search and edit.")
         self.category.currentTextChanged.connect(self._switch_section)
         layout.addWidget(self.category)
 
         self.search = NoWheelComboBox()
         self.search.setEditable(True)
         self.search.setPlaceholderText("Search sigils and traits...")
+        self.search.setToolTip("Search for a sigil or trait in the selected collection.")
         self.search.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.search.lineEdit().textEdited.connect(self._filter_names)
         layout.addWidget(self.search, 1)
 
         load = QPushButton("Edit")
+        load.setToolTip("Load the item currently selected in the search field.")
         load.clicked.connect(self._search_activated)
         layout.addWidget(load)
 
         new = QPushButton("+ New item")
+        new.setToolTip("Clear the form and start a new sigil or trait.")
         new.clicked.connect(self._new_item)
         layout.addWidget(new)
         return box
@@ -112,22 +135,27 @@ class SigilTraitEditor(QWidget):
         form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
         self.name_edit = QLineEdit()
+        self.name_edit.setToolTip("Name used by card data and to locate the item's icon asset.")
         self.name_edit.textChanged.connect(self._changed)
         form.addRow("Name", self.name_edit)
 
         self.description_edit = QLineEdit()
+        self.description_edit.setToolTip("Description shown with this sigil or trait. Supports line breaks and rich-text markup.")
         self.description_edit.textChanged.connect(self._changed)
         form.addRow("Description", self.description_edit)
 
         self.type_combo = NoWheelComboBox()
         self.type_combo.addItems(["Sigil", "Trait"])
+        self.type_combo.setToolTip("Select whether this item belongs to the sigil or trait collection.")
         self.type_combo.currentTextChanged.connect(self._changed)
         form.addRow("Type", self.type_combo)
 
         # These paths are discovered from the item name and selected separately.
         self.icon_edit = QLineEdit()
         self.icon_edit.setReadOnly(True)
+        self.icon_edit.setToolTip("Primary icon asset used to render this sigil or trait.")
         choose_icon = QPushButton("Choose icon...")
+        choose_icon.setToolTip("Choose the primary icon image for this item.")
         choose_icon.clicked.connect(self._choose_icon)
         icon_row = QHBoxLayout()
         icon_row.addWidget(self.icon_edit, 1)
@@ -136,9 +164,12 @@ class SigilTraitEditor(QWidget):
 
         self.colorless_icon_edit = QLineEdit()
         self.colorless_icon_edit.setReadOnly(True)
+        self.colorless_icon_edit.setToolTip("Optional monochrome outline icon used for colorless exports.")
         colorless_choose_icon = QPushButton("Choose colorless icon...")
+        colorless_choose_icon.setToolTip("Choose the monochrome outline icon used for colorless exports.")
         colorless_choose_icon.clicked.connect(lambda: self._choose_icon(colorless=True))
         colorless_delete_icon = QPushButton("X")
+        colorless_delete_icon.setToolTip("Remove the optional colorless outline icon.")
         colorless_delete_icon.setFixedWidth(30)
         colorless_delete_icon.clicked.connect(self._delete_colorless_icon)
         colorless_icon_row = QHBoxLayout()
@@ -149,7 +180,9 @@ class SigilTraitEditor(QWidget):
 
         self.conduit_icon_edit = QLineEdit()
         self.conduit_icon_edit.setReadOnly(True)
+        self.conduit_icon_edit.setToolTip("Optional indicator artwork used when this sigil is tagged conduit_sigil.")
         conduit_choose_icon = QPushButton("Choose conduit image...")
+        conduit_choose_icon.setToolTip("Choose the conduit indicator artwork for this sigil.")
         conduit_choose_icon.clicked.connect(lambda: self._choose_icon(conduit=True))
         self.conduit_icon_row = QWidget()
         conduit_icon_layout = QHBoxLayout(self.conduit_icon_row)
@@ -159,10 +192,12 @@ class SigilTraitEditor(QWidget):
 
         # Tags drive renderer behavior; conduit art is only relevant to sigils.
         self.tags = QWidget()
+        self.tags.setToolTip("Tags control special rendering behavior for sigils and traits.")
         tags_layout = QVBoxLayout(self.tags)
         self.tag_checks = {}
         for tag in SIGIL_TAG_OPTIONS:
             check = QPushButton(tag)
+            check.setToolTip(_SIGIL_TAG_TOOLTIPS[tag])
             check.setCheckable(True)
             check.toggled.connect(self._changed)
             self.tag_checks[tag] = check
@@ -177,6 +212,7 @@ class SigilTraitEditor(QWidget):
         actions = QHBoxLayout()
         delete = QPushButton("Delete item")
         delete.setObjectName("dangerButton")
+        delete.setToolTip("Delete this sigil or trait data record after confirmation.")
         delete.clicked.connect(self._delete_item)
         actions.addWidget(delete)
         outer.addLayout(actions)
@@ -191,6 +227,7 @@ class SigilTraitEditor(QWidget):
         self.preview.setAlignment(Qt.AlignCenter)
         self.preview.setMinimumSize(320, 420)
         self.preview.setStyleSheet("background: #e8edf5;")
+        self.preview.setToolTip("Live card preview showing this item in a sample card.")
         layout.addWidget(self.preview, 1)
 
         self.preview_bar = QWidget()
@@ -199,9 +236,11 @@ class SigilTraitEditor(QWidget):
         self.preview_condition = NoWheelComboBox()
         self.preview_condition.addItems(["None", "Cell", "Latch", "Hint", "Gemified", "Tribal", "Rainbow"])
         self.preview_condition.setCurrentText("None")
+        self.preview_condition.setToolTip("Choose a conditional style for the sample sigil preview.")
         self.preview_condition.currentTextChanged.connect(self._condition_changed)
         preview_layout.addWidget(self.preview_condition)
         self.preview_gems = Gemification(False)
+        set_widget_tooltip(self.preview_gems, "Choose gem colors for the sample sigil preview.")
         self.preview_gems.setVisible(False)
         self.preview_gems.changed.connect(self._render_preview)
         preview_layout.addWidget(self.preview_gems)
@@ -211,8 +250,10 @@ class SigilTraitEditor(QWidget):
 
         buttons = QHBoxLayout()
         save = QPushButton("Save")
+        save.setToolTip("Save the current item data without exporting an icon.")
         save.clicked.connect(self._save)
         save_export = QPushButton("Save and Export")
+        save_export.setToolTip("Save this item and export its selected icon assets.")
         save_export.clicked.connect(lambda: self._save(export=True))
         buttons.addWidget(save)
         buttons.addWidget(save_export)

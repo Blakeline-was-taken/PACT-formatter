@@ -28,7 +28,7 @@ from PySide6.QtWidgets import (
 
 from model import sigils
 from ..card_editor.data import CARDS_PATH, parse_card_tags
-from ..gui_helpers import ColorPickerButton, NoWheelComboBox, ROOT, open_folder
+from ..gui_helpers import ColorPickerButton, NoWheelComboBox, ROOT, open_folder, set_widget_tooltip
 from ..sigil_trait_editor.data import SIGIL_PATH, TRAIT_PATH
 from .data import (
     COST_FILTERS,
@@ -120,6 +120,7 @@ class ExportPanel(QWidget):
         header_layout = QFormLayout(self.header)
         self.type_combo = NoWheelComboBox()
         self.type_combo.addItems(EXPORT_TYPES)
+        self.type_combo.setToolTip("Choose to view and export cards, sigils, or traits.")
         self.type_combo.currentTextChanged.connect(self._change_type)
         header_layout.addRow("Export type", self.type_combo)
         self.options_widget = QWidget()
@@ -129,7 +130,9 @@ class ExportPanel(QWidget):
         output_row = QHBoxLayout()
         self.output_edit = QLineEdit(self.output_dirs[self.item_type])
         self.output_edit.setReadOnly(True)
+        self.output_edit.setToolTip("Destination folder for the exports.")
         browse = QPushButton("Choose folder...")
+        browse.setToolTip("Choose the output folder for the exports.")
         browse.clicked.connect(self._choose_output)
         output_row.addWidget(self.output_edit, 1)
         output_row.addWidget(browse)
@@ -168,13 +171,16 @@ class ExportPanel(QWidget):
         result_title.setObjectName("sectionTitle")
         self.result_count = QLabel()
         self.result_count.setObjectName("mutedText")
+        self.result_count.setToolTip("Number of items matching the current filters.")
         self.preview_button = QPushButton("See preview")
         self.preview_button.setCheckable(True)
-        self.preview_button.setToolTip("Sigil previews use the first selected export format.")
+        self.preview_button.setToolTip("Toggle between raw assets and rendered export previews.")
         self.preview_button.toggled.connect(self._toggle_preview)
         select_all = QPushButton("Select all")
+        select_all.setToolTip("Add every item currently visible after filtering to the export selection.")
         select_all.clicked.connect(self._select_all_visible)
         deselect_all = QPushButton("Deselect all")
+        deselect_all.setToolTip("Remove every currently visible item from the export selection.")
         deselect_all.clicked.connect(self._deselect_all_visible)
         result_header.addWidget(result_title)
         result_header.addStretch()
@@ -186,6 +192,7 @@ class ExportPanel(QWidget):
         self.preview_error_label = QLabel()
         self.preview_error_label.setWordWrap(True)
         self.preview_error_label.setObjectName("mutedText")
+        self.preview_error_label.setToolTip("Export preview could not be rendered.")
         self.preview_error_label.hide()
         collection_layout.addWidget(self.preview_error_label)
         self.results = ExportResultsView()
@@ -203,19 +210,24 @@ class ExportPanel(QWidget):
 
     def _build_sidebar(self):
         sidebar = QGroupBox("Selected items")
+        sidebar.setToolTip("Items selected for the next export. Drag across items in the collection to select them.")
         sidebar.setMinimumWidth(250)
         sidebar.setMaximumWidth(340)
         layout = QVBoxLayout(sidebar)
         self.selected_count = QLabel("0 selected")
+        self.selected_count.setToolTip("Number of items currently selected for export.")
         layout.addWidget(self.selected_count)
         self.selected_list = DragSelectListWidget()
         self.selected_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.selected_list.setToolTip("Selected items. Select one or more entries here before removing them.")
         layout.addWidget(self.selected_list, 1)
         remove = QPushButton("Remove selected")
+        remove.setToolTip("Remove highlighted entries from the export selection.")
         remove.clicked.connect(self._remove_selected)
         layout.addWidget(remove)
         self.export_button = QPushButton("Export")
         self.export_button.setObjectName("primaryButton")
+        self.export_button.setToolTip("Export all selected items to the output folder.")
         self.export_button.clicked.connect(self._start_export)
         layout.addWidget(self.export_button)
         return sidebar
@@ -272,18 +284,21 @@ class ExportPanel(QWidget):
     def _build_card_options(self):
         self.sorted_option = QCheckBox("Sort into Temple/Tier folders")
         self.sorted_option.setChecked(True)
+        self.sorted_option.setToolTip("Place exported cards in subfolders named after their temple and tier.")
         self.options_layout.addWidget(self.sorted_option)
         self.options_layout.addStretch()
 
     def _build_item_options(self, item_type):
         self.export_color = (0, 0, 0)
         self.color_button = ColorPickerButton(self.export_color, "Color")
+        self.color_button.setToolTip("Choose the color applied to exported sigils or traits.")
         self.color_button.colorPicked.connect(self._set_export_color)
         self.options_layout.addWidget(self.color_button)
         self.format_checks = {}
         if item_type == "Sigils":
             for label in ("Standard", "Shortened", "Base game", "Patch"):
                 check = QCheckBox(label)
+                check.setToolTip(f"Include the {label.lower()} sigil variant in the export.")
                 check.setChecked(label == "Standard")
                 check.toggled.connect(self._preview_options_changed)
                 self.options_layout.addWidget(check)
@@ -334,7 +349,11 @@ class ExportPanel(QWidget):
         return layout
 
     def _labeled_filter(self, label, field, layout):
-        layout.addWidget(QLabel(label))
+        tooltip = field.toolTip() or f"Filter available items by {label.lower()}."
+        label_widget = QLabel(label)
+        label_widget.setToolTip(tooltip)
+        set_widget_tooltip(field, tooltip)
+        layout.addWidget(label_widget)
         layout.addWidget(field)
 
     def _autocomplete(self, values, placeholder):
@@ -364,6 +383,9 @@ class ExportPanel(QWidget):
         self.name_filter = self._autocomplete(names, "Card name")
         self.temple_filter = self._autocomplete(temples, "Temple")
         self.tier_filter = self._autocomplete(tiers, "Tier")
+        self.name_filter.setToolTip("Show cards whose names contain this text.")
+        self.temple_filter.setToolTip("Show cards whose temple contains this text.")
+        self.tier_filter.setToolTip("Show cards whose tier contains this text.")
         self._labeled_filter("Card Name", self.name_filter, data)
         self._labeled_filter("Temple", self.temple_filter, data)
         self._labeled_filter("Tier", self.tier_filter, data)
@@ -373,8 +395,7 @@ class ExportPanel(QWidget):
         cost_grid = QGridLayout()
         for index, (label, key) in enumerate(COST_FILTERS):
             check = QCheckBox("Overcharge" if key == "max" else label)
-            if key == "max":
-                check.setToolTip("Overcharge (max)")
+            check.setToolTip(f"Include cards that cost {label.lower()}.")
             check.toggled.connect(self._schedule_results_refresh)
             self.cost_checks[key] = check
             cost_grid.addWidget(check, index // 2, index % 2)
@@ -395,14 +416,17 @@ class ExportPanel(QWidget):
             row.addWidget(QLabel(stat))
             operator = NoWheelComboBox()
             operator.addItems(STAT_OPERATORS)
+            operator.setToolTip(f"Comparison used to filter cards by {stat.lower()}.")
             value = QLineEdit()
             value.setPlaceholderText("Value")
+            value.setToolTip(f"Value compared with the card's {stat.lower()}. Leave blank to ignore.")
             operator.currentTextChanged.connect(self._schedule_results_refresh)
             value.textChanged.connect(self._schedule_results_refresh)
             row.addWidget(operator)
             row.addWidget(value)
             stats.addLayout(row)
             has_sigil = QCheckBox(f"Has {stat.lower()} sigil")
+            has_sigil.setToolTip(f"Show only cards with a sigil or trait tagged to replace {stat.lower()}.")
             has_sigil.toggled.connect(self._schedule_results_refresh)
             stats.addWidget(has_sigil)
             setattr(self, f"has_{stat.lower()}_sigil_filter", has_sigil)
@@ -419,6 +443,7 @@ class ExportPanel(QWidget):
             for card in self.cards:
                 values.extend(_card_filter_values(card, category, field))
             selector = SelectedValues(_unique(values), f"Search {category.lower()}...")
+            selector.setToolTip(f"Filter cards by one or more {category.lower()}.")
             selector.changed.connect(self._schedule_results_refresh)
             box.addWidget(QLabel(f"Select {category.lower()}"))
             box.addWidget(selector)
@@ -436,11 +461,15 @@ class ExportPanel(QWidget):
 
         tags = self._filter_box("Tags")
         self.background_filter = self._autocomplete((tag[:-3] for card in self.cards for tag in _split_list(card.get("Tags", "")) if tag.endswith("_bg")), "Background sigil tag")
+        self.background_filter.setToolTip("Show cards whose background modifier contains this text.")
         self.extra_cells_filter = OptionalSpinBox()
+        self.extra_cells_filter.setToolTip("Match this exact number of extra energy cells. Leave blank to ignore.")
         self.extra_cells_filter.valueChanged.connect(self._schedule_results_refresh)
         symbol_names = (_display_name(row.get("Name", "")) for row in self.sigils)
         self.symbol_1_filter = self._autocomplete(symbol_names, "Symbol 1")
         self.symbol_2_filter = self._autocomplete((_display_name(row.get("Name", "")) for row in self.sigils), "Symbol 2")
+        self.symbol_1_filter.setToolTip("Filter by a sigil used as a symbol.")
+        self.symbol_2_filter.setToolTip("Filter by a sigil used as a symbol.")
         for label, widget in (
             ("Background", self.background_filter),
             ("Extra Cells", self.extra_cells_filter),
@@ -465,11 +494,13 @@ class ExportPanel(QWidget):
             (_display_name(row.get("Name", "")) for row in rows),
             f"Search {self.item_type[:-1].lower()} name...",
         )
+        self.item_name_filter.setToolTip(f"Show {self.item_type.lower()} whose names contain this text.")
         self._labeled_filter(f"{self.item_type[:-1]} Name", self.item_name_filter, data)
         tags = self._filter_box("Tags")
         self.item_tag_checks = {}
         for tag in ITEM_TAG_FILTERS:
             check = QCheckBox(tag.replace("_", " ").title())
+            check.setToolTip(f"Show only {self.item_type.lower()} with the {tag} tag.")
             check.toggled.connect(self._schedule_results_refresh)
             self.item_tag_checks[tag] = check
             tags.addWidget(check)

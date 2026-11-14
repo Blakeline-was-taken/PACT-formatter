@@ -217,7 +217,13 @@ class ExportResultsModel(QAbstractListModel):
         if role == Qt.DecorationRole:
             return self._icon_for_row(row, key)
         if role == Qt.ToolTipRole:
-            return name
+            details = [name]
+            if self.item_type == "Cards":
+                details.extend((f"Temple: {row.get('Temple', '')}", f"Tier: {row.get('Tier', '')}"))
+            details.append("Click or drag across items to add or remove them from the selection.")
+            if self.preview_mode:
+                details.append("The thumbnail is a rendered export preview.")
+            return "\n".join(details)
         if role == self.ITEM_KEY_ROLE:
             return key
         if role == self.SELECTED_ROLE:
@@ -411,6 +417,7 @@ class SelectedValues(QWidget):
         self.search.setMinimumWidth(0)
         self.search.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         self.search.setPlaceholderText(placeholder)
+        self.search.setToolTip("Search for a value, then add it to the selected filter values.")
         self.search.addItems(choices)
         self.search.setCurrentIndex(-1)
         self.search.setCurrentText("")
@@ -420,6 +427,7 @@ class SelectedValues(QWidget):
         self.search.setCompleter(completer)
         self.search.lineEdit().returnPressed.connect(self.add_value)
         add = QPushButton("Add")
+        add.setToolTip("Add the entered value to the filter.")
         add.setFixedWidth(44)
         add.clicked.connect(self.add_value)
         row.addWidget(self.search, 1)
