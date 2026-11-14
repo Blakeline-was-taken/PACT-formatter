@@ -8,12 +8,10 @@ from ..gui_helpers import ROOT
 
 CONFIG_PATH = ROOT / "config.json"
 COORDINATE_FIELDS = {
-    "power_coord",
-    "health_coord",
+    "power_center",
+    "health_center",
     "left_symbol",
     "right_symbol",
-    "power_sigil_center",
-    "health_sigil_center",
 }
 
 TEMPLATE_SECTIONS = {
@@ -52,8 +50,8 @@ TEMPLATE_SECTIONS = {
         "flavor_text_top_border": 962,
         "flavor_text_left_border": 300,
         "flavor_text_right_border": 1000,
-        "power_coord": [198, 885],
-        "health_coord": [895, 225],
+        "power_center": [220, 925],
+        "health_center": [915, 265],
         "sigil_name_font_size": 55,
         "sigil_description_font_size": 45,
         "trait_description_font_size": 40,
@@ -81,8 +79,6 @@ TEMPLATE_SECTIONS = {
         "sigil_top_displacement": 3,
         "sigil_left_border": 120,
         "sigil_bottom_border": 1430,
-        "power_sigil_center": [220, 925],
-        "health_sigil_center": [915, 265],
         "traitline_vertical_spacing": 6,
         "trait_vertical_spacing": 0,
     },

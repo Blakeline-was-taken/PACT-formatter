@@ -7,7 +7,7 @@ from model import (
     logging,
     ROOT, ASSETS_DIR, GENERAL_ASSETS_DIR, DEFAULT_CONFIG
 )
-from model.text import draw_rich_text, measure_rich_text
+from model.text import draw_rich_text, get_inline_icon_size, measure_rich_text, strip_rich_text_tags
 
 
 STAT_GEM_NAMES = {"green", "blue", "orange", "prism"}
@@ -490,28 +490,58 @@ def write_art_credit(config, color_map, image, draw, csv_dict):
     )
 
 
+def _stat_text_position(text, font, center, color_map, config):
+    """Return a text origin that centers a stat's rendered bounds on a point."""
+    width = measure_rich_text(text, font, "black", color_map, config)
+    visible_text = strip_rich_text_tags(text).replace(r"\n", "\n")
+    lines = visible_text.split("\n") or ["0"]
+    line_height = max(font.size, get_inline_icon_size(text, font))
+    line_bounds = [font.getbbox(line or "0") for line in lines]
+    top = min(bounds[1] + index * line_height for index, bounds in enumerate(line_bounds))
+    bottom = max(bounds[3] + index * line_height for index, bounds in enumerate(line_bounds))
+    return center[0] - width // 2, center[1] - (top + bottom) // 2
+
+
+def _centered_image_position(image, center):
+    return center[0] - image.width // 2, center[1] - image.height // 2
+
+
 def write_stats(config, color_map, image, csv_dict, power_sigil, health_sigil, bg_modifier):
     stats_font = ImageFont.truetype(_font_path(config), config['stats_font_size'])
     
     if power_sigil and config['show_power_sigil']:
-        power_center = config['power_sigil_center']
-        image = paste_sigil(image, power_sigil, (power_center[0] - power_sigil.width // 2, power_center[1] - power_sigil.height // 2))
+        image = paste_sigil(image, power_sigil, _centered_image_position(power_sigil, config["power_center"]))
     else:
         power = csv_dict["Power"]
         gemification = parse_stat_gemification(power)
         if gemification:
             power = gemification[2]
-        draw_rich_text(image, power, stats_font, config['power_coord'], "black", color_map, config)
+        draw_rich_text(
+            image,
+            power,
+            stats_font,
+            _stat_text_position(power, stats_font, config["power_center"], color_map, config),
+            "black",
+            color_map,
+            config,
+        )
 
     if health_sigil and config['show_health_sigil']:
-        health_center = config['health_sigil_center']
-        image = paste_sigil(image, health_sigil, (health_center[0] - health_sigil.width // 2, health_center[1] - health_sigil.height // 2))
+        image = paste_sigil(image, health_sigil, _centered_image_position(health_sigil, config["health_center"]))
     else:
         health = csv_dict["Health"]
         gemification = parse_stat_gemification(health)
         if gemification:
             health = gemification[2]
-        draw_rich_text(image, health, stats_font, config['health_coord'], "black", color_map, config)
+        draw_rich_text(
+            image,
+            health,
+            stats_font,
+            _stat_text_position(health, stats_font, config["health_center"], color_map, config),
+            "black",
+            color_map,
+            config,
+        )
 
     return image
 
