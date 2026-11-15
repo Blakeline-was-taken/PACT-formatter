@@ -81,7 +81,7 @@ class SigilTraitEditor(QWidget):
         content = QSplitter(Qt.Horizontal)
         content.addWidget(self._build_form())
         content.addWidget(self._build_preview())
-        content.setSizes([560, 260])
+        content.setSizes([300, 360])
         content.setStretchFactor(0, 1)
         content.setStretchFactor(1, 0)
         splitter.addWidget(content)
@@ -93,7 +93,6 @@ class SigilTraitEditor(QWidget):
     def _build_sidebar(self):
         """Build the existing selectors and a draggable sigil/trait order list."""
         sidebar = QWidget()
-        sidebar.setMinimumWidth(220)
         layout = QVBoxLayout(sidebar)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._build_header())
@@ -175,7 +174,6 @@ class SigilTraitEditor(QWidget):
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         body = QWidget()
         body.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        body.setMinimumWidth(0)
         form = QFormLayout(body)
         form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 

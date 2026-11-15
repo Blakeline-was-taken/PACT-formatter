@@ -76,7 +76,6 @@ class ExportProgressDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Exporting")
         self.setWindowModality(Qt.WindowModal)
-        self.setMinimumWidth(440)
         layout = QVBoxLayout(self)
         self.status = QLabel("Preparing export...")
         layout.addWidget(self.status)
@@ -131,7 +130,6 @@ class OptionalSpinBox(NoWheelSpinBox):
         self._blank = True
         self.setRange(0, 2147483647)
         self.setKeyboardTracking(False)
-        self.setMinimumWidth(0)
         self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         self.lineEdit().textEdited.connect(self._mark_nonblank)
         self.valueChanged.connect(self._mark_nonblank)
@@ -420,7 +418,6 @@ class SelectedValues(QWidget):
         self.search.setInsertPolicy(QComboBox.NoInsert)
         self.search.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
         self.search.setMinimumContentsLength(6)
-        self.search.setMinimumWidth(0)
         self.search.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         self.search.setPlaceholderText(placeholder)
         self.search.setToolTip("Search for a value, then add it to the selected filter values.")

@@ -109,7 +109,6 @@ class ExportPanel(QWidget):
         self.main_splitter = splitter
 
         filter_column = QWidget()
-        filter_column.setMinimumWidth(220)
         filter_column.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
         filter_column_layout = QVBoxLayout(filter_column)
         filter_column_layout.setContentsMargins(0, 0, 0, 0)
@@ -199,12 +198,11 @@ class ExportPanel(QWidget):
         self.results.selectionDragFinished.connect(self._finish_result_drag_selection)
         self.results.resized.connect(self._update_result_columns)
         collection_layout.addWidget(self.results, 1)
-        self.collection_column.setMinimumWidth(440)
         self.collection_column.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Expanding)
         splitter.addWidget(self.collection_column)
         self.selected_panel = self._build_sidebar()
         splitter.addWidget(self.selected_panel)
-        splitter.setSizes([298, 600, 362])
+        splitter.setSizes([298, 690, 302])
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
         splitter.setStretchFactor(2, 0)
@@ -213,7 +211,6 @@ class ExportPanel(QWidget):
     def _build_sidebar(self):
         sidebar = QGroupBox("Selected items")
         sidebar.setToolTip("Items selected for the next export. Drag across items in the collection to select them.")
-        sidebar.setMinimumWidth(250)
         layout = QVBoxLayout(sidebar)
         self.selected_count = QLabel("0 selected")
         self.selected_count.setToolTip("Number of items currently selected for export.")
@@ -364,7 +361,6 @@ class ExportPanel(QWidget):
         field.setInsertPolicy(QComboBox.NoInsert)
         field.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
         field.setMinimumContentsLength(6)
-        field.setMinimumWidth(0)
         field.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         field.setPlaceholderText(placeholder)
         field.addItems(_unique(values))

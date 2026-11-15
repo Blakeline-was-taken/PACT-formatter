@@ -5,7 +5,7 @@ import shutil
 from pathlib import Path
 
 from PIL.ImageQt import ImageQt
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QTimer, Qt
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -47,9 +47,12 @@ from ..sorting import SortDialog, sort_records
 class CardEditor(QWidget):
     """Search, edit, preview, save, export, and delete card records."""
 
+    _SIDEBAR_DEFAULT_WIDTH = 300
+
     def __init__(self):
         """Load card data, build the editor, and select an initial record."""
         super().__init__()
+        self._sidebar_default_pending = True
         self.rows = []
         self.fieldnames = CARD_FIELDS
         self.current_index = -1
@@ -61,6 +64,18 @@ class CardEditor(QWidget):
         self._build_ui()
         self._refresh_order_list()
         self._select_index(0 if self.rows else -1)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if self._sidebar_default_pending:
+            self._sidebar_default_pending = False
+            QTimer.singleShot(0, self._set_default_sidebar_width)
+
+    def _set_default_sidebar_width(self):
+        splitter = self._sidebar_splitter
+        available_width = max(0, splitter.width() - splitter.handleWidth())
+        sidebar_width = min(self._SIDEBAR_DEFAULT_WIDTH, available_width)
+        splitter.setSizes([sidebar_width, available_width - sidebar_width])
 
     # Startup data and page layout
 
@@ -91,17 +106,17 @@ class CardEditor(QWidget):
         content = QSplitter(Qt.Horizontal)
         content.addWidget(self._build_form())
         content.addWidget(self._build_preview())
-        content.setSizes([600, 260])
+        content.setSizes([300, 360])
         content.setStretchFactor(0, 1)
         content.setStretchFactor(1, 0)
         splitter.addWidget(content)
-        splitter.setSizes([300, 860])
+        splitter.setSizes([self._SIDEBAR_DEFAULT_WIDTH, 830])
+        self._sidebar_splitter = splitter
         root.addWidget(splitter, 1)
 
     def _build_sidebar(self):
         """Build card selection controls and the draggable card-order list."""
         sidebar = QWidget()
-        sidebar.setMinimumWidth(220)
         layout = QVBoxLayout(sidebar)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._build_header())
@@ -145,7 +160,7 @@ class CardEditor(QWidget):
         self.search.setEditable(True)
         self.search.setPlaceholderText("Search cards by name...")
         self.search.setToolTip("Search existing cards by name, then load one to edit.")
-        self.search.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.search.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
         self.search.lineEdit().textEdited.connect(self._filter_cards)
         search_row = QHBoxLayout()
         search_row.addWidget(self.search, 1)
@@ -176,7 +191,6 @@ class CardEditor(QWidget):
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         body = QWidget()
         body.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        body.setMinimumWidth(0)
         form = QFormLayout(body)
         form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
