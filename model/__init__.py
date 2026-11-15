@@ -50,7 +50,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
-def get_color_mapping(temple, tier=None, bg_modifier=None):
+def get_color_mapping(temple, tier=None, bg_modifier=None, config_override=None):
     """
     Loads and returns the color mapping dictionary for a specific temple and tier.
     Maps general color keys (from general_assets/colors.png) to temple/tier-specific colors.
@@ -82,7 +82,7 @@ def get_color_mapping(temple, tier=None, bg_modifier=None):
     if not color_path:
         color_path = GENERAL_ASSETS_DIR / "colors.png"  # Fallback to general colors
 
-    config = load_config(temple, tier, bg_modifier)
+    config = config_override or load_config(temple, tier, bg_modifier)
     color_keys = list(Image.open(GENERAL_ASSETS_DIR / "colors.png").getdata())
     colors = list(Image.open(color_path).getdata())
 
