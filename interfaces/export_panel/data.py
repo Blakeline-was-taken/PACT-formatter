@@ -6,7 +6,6 @@ import re
 from model.text import strip_rich_text_tags
 
 from ..card_editor.fields import SigilList
-from ..tag_data import TAG_OPTIONS
 
 
 EXPORT_TYPES = ("Cards", "Sigils", "Traits")
@@ -23,7 +22,6 @@ COST_FILTERS = (
     ("Free", "free"),
 )
 STAT_OPERATORS = ("", "=", ">", ">=", "<", "<=", "!=")
-ITEM_TAG_FILTERS = TAG_OPTIONS
 
 
 def load_csv(path):
@@ -96,14 +94,15 @@ def matches_stat(value, operator, target):
         return False
     if actual is None:
         return False
-    return {
+    results = {
         "=": actual == expected,
         ">": actual > expected,
         ">=": actual >= expected,
         "<": actual < expected,
         "<=": actual <= expected,
         "!=": actual != expected,
-    }[operator]
+    }
+    return results[operator]
 
 
 def crop_card_art(art):

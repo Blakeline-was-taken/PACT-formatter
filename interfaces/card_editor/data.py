@@ -5,7 +5,6 @@ from pathlib import Path
 
 from model import DEFAULT_CONFIG
 from ..gui_helpers import ROOT, _join, _split, safe_filename
-from ..tag_data import TAG_OPTIONS as TAG_OPTIONS
 
 CARDS_PATH = ROOT / DEFAULT_CONFIG["cards_file_path"]
 ASSET_PATH = ROOT / DEFAULT_CONFIG["assets_dir"] / "general_assets" / "card_art"

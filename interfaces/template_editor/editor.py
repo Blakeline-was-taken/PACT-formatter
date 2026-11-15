@@ -302,9 +302,7 @@ class TemplateEditor(QWidget):
         outer.addWidget(scroll, 1)
 
         restore = QPushButton("Restore Default Settings")
-        restore.setToolTip(
-            "Reset built-in defaults in the default layer, or remove overrides from the selected layer."
-        )
+        restore.setToolTip("Reset built-in defaults in the default layer, or remove overrides from the selected layer.")
         restore.clicked.connect(self._restore_defaults)
         outer.addWidget(restore)
         return container
@@ -435,9 +433,7 @@ class TemplateEditor(QWidget):
         # A single RGB triplet or index is accepted alongside a list of entries.
         if isinstance(value, dict) and set(value) == {"index"}:
             entries = [value]
-        elif isinstance(value, list) and len(value) == 3 and all(
-                isinstance(channel, int) and not isinstance(channel, bool) and 0 <= channel <= 255 for channel in value
-            ):
+        elif isinstance(value, list) and len(value) == 3 and all(isinstance(channel, int) and not isinstance(channel, bool) and 0 <= channel <= 255 for channel in value):
             entries = [value]
         elif isinstance(value, list) and value:
             entries = value
@@ -453,9 +449,7 @@ class TemplateEditor(QWidget):
                 if not isinstance(index, int) or isinstance(index, bool) or not 1 <= index <= 1_000_000:
                     raise ValueError(f"Text color '{name}' contains an invalid palette index.")
                 parsed.append(("Color index", index))
-            elif isinstance(entry, list) and len(entry) == 3 and all(
-                    isinstance(channel, int) and not isinstance(channel, bool) and 0 <= channel <= 255 for channel in entry
-                ):
+            elif isinstance(entry, list) and len(entry) == 3 and all(isinstance(channel, int) and not isinstance(channel, bool) and 0 <= channel <= 255 for channel in entry):
                 parsed.append(("RGB color", entry))
             else:
                 raise ValueError(f"Text color '{name}' contains an unsupported palette entry.")
@@ -644,11 +638,7 @@ class TemplateEditor(QWidget):
             QMessageBox.warning(self, "Invalid color name", "Color names cannot contain braces.")
             return
         if any(key.casefold() == name.casefold() for key in self._text_colors):
-            QMessageBox.warning(
-                self,
-                "Color already exists",
-                f"A color named '{name}' already exists.",
-            )
+            QMessageBox.warning(self, "Color already exists", f"A color named '{name}' already exists.")
             return
         self._text_colors[name] = [[0, 0, 0]]
         self._load_color_editor(name)
@@ -774,11 +764,7 @@ class TemplateEditor(QWidget):
         text_colors = self._effective_values.get("text_colors", {})
         if not isinstance(text_colors, dict):
             self._loading = False
-            QMessageBox.critical(
-                self,
-                "Could not load template settings",
-                "'text_colors' must be an object.",
-            )
+            QMessageBox.critical(self, "Could not load template settings", "'text_colors' must be an object.",)
             return
         try:
             for name, value in text_colors.items():
@@ -1052,11 +1038,7 @@ class TemplateEditor(QWidget):
                 raise ValueError("Color names cannot contain braces.")
             renamed_color = self._editing_color_key is not None and color_name.casefold() != self._editing_color_key.casefold()
             if renamed_color:
-                duplicate_name = any(
-                    key != self._editing_color_key
-                    and key.casefold() == color_name.casefold()
-                    for key in self._text_colors
-                )
+                duplicate_name = any(key != self._editing_color_key and key.casefold() == color_name.casefold() for key in self._text_colors)
                 if duplicate_name:
                     raise ValueError(f"A color named '{color_name}' already exists.")
                 self._color_editor_changed()

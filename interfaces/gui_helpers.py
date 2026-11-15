@@ -3,13 +3,14 @@
 import re
 from pathlib import Path
 
-from PySide6.QtCore import QUrl, Signal
+from PySide6.QtCore import QUrl, Qt, Signal
 from PySide6.QtGui import QColor, QDesktopServices, QIcon, QPixmap
 from PySide6.QtWidgets import (
     QColorDialog,
     QComboBox,
     QDialog,
     QHBoxLayout,
+    QLabel,
     QLineEdit,
     QPushButton,
     QSpinBox,
@@ -40,43 +41,45 @@ def set_widget_tooltip(widget, text):
             child.setToolTip(text)
 
 
+class AspectRatioPixmapLabel(QLabel):
+    """Display a pixmap scaled to the label's current size without distortion."""
+
+    def __init__(self, text="", parent=None):
+        super().__init__(text, parent)
+        self._source_pixmap = None
+
+    def set_source_pixmap(self, pixmap):
+        """Set the original pixmap and scale it to the current label bounds."""
+        self._source_pixmap = pixmap
+        self._update_scaled_pixmap()
+
+    def clear(self):
+        """Clear both the displayed image and the source used for future resizes."""
+        self._source_pixmap = None
+        super().clear()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._update_scaled_pixmap()
+
+    def _update_scaled_pixmap(self):
+        if self._source_pixmap is not None and self.width() > 0 and self.height() > 0:
+            super().setPixmap(self._source_pixmap.scaled(self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
+
+
 def create_card_preview(
-    card_name="",
-    art_file="",
-    temple="",
-    tier="",
-    cost="",
-    power="",
-    health="",
-    sigils="",
-    token="",
-    traits="",
-    tribes="",
-    flavor_text="",
-    credit="",
-    tags="",
-    config=None,
-):
+        card_name="", art_file="", temple="", tier="", cost="", power="", health="",
+        sigils="", token="", traits="", tribes="", flavor_text="", credit="", tags="", config=None,
+    ):
     """Render a preview card from editor field values.
 
     The keyword arguments mirror the card CSV columns so previews use the same
     renderer interface as saved cards.
     """
     card_data = {
-        "Card Name": card_name,
-        "Art File": art_file,
-        "Temple": temple,
-        "Tier": tier,
-        "Cost": cost,
-        "Power": power,
-        "Health": health,
-        "Sigils": sigils,
-        "Token": token,
-        "Traits": traits,
-        "Tribes": tribes,
-        "Flavor Text": flavor_text,
-        "Credit": credit,
-        "Tags": tags,
+        "Card Name": card_name, "Art File": art_file, "Temple": temple, "Tier": tier,
+        "Cost": cost, "Power": power, "Health": health, "Sigils": sigils, "Token": token, "Traits": traits,
+        "Tribes": tribes, "Flavor Text": flavor_text, "Credit": credit, "Tags": tags
     }
     return create_card(card_data, config)
 

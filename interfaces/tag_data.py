@@ -16,6 +16,30 @@ TAG_TOOLTIPS = {
 
 TAG_OPTIONS = tuple(TAG_TOOLTIPS)
 
+CARD_TAG_OPTIONS = (
+    "conduit_indicator",
+    "mox_indicator",
+    "mox_green",
+    "mox_orange",
+    "mox_blue",
+    "mox_prism",
+    "gemified_vanilla",
+    "conduit_sigil_indicator",
+)
+
+SIGIL_TRAIT_TAG_OPTIONS = (
+    "mox_green",
+    "mox_orange",
+    "mox_blue",
+    "mox_prism",
+    "power_sigil",
+    "health_sigil",
+    "conduit_sigil",
+)
+
+CARD_TAG_TOOLTIPS = {tag: TAG_TOOLTIPS[tag] for tag in CARD_TAG_OPTIONS}
+SIGIL_TRAIT_TAG_TOOLTIPS = {tag: TAG_TOOLTIPS[tag] for tag in SIGIL_TRAIT_TAG_OPTIONS}
+
 
 def tag_tooltip(tag):
     """Return help for a known tag or explain that a custom tag has no renderer behavior."""

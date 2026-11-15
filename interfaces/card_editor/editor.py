@@ -8,13 +8,17 @@ from PIL.ImageQt import ImageQt
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QComboBox,
+    QDialog,
     QFileDialog,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QMessageBox,
     QPushButton,
     QScrollArea,
@@ -30,7 +34,6 @@ from model.text import strip_rich_text_tags
 from .data import (
     ASSET_PATH,
     CARD_FIELDS,
-    CARDS_PATH,
     CardRepository,
     card_export_filenames,
     card_export_path,
@@ -38,7 +41,8 @@ from .data import (
     parse_card_tags,
 )
 from .fields import CostList, ElementList, SigilList, TagList
-from ..gui_helpers import Gemification, NoWheelComboBox, ROOT, _split, _join, set_widget_tooltip
+from ..gui_helpers import AspectRatioPixmapLabel, Gemification, NoWheelComboBox, ROOT, _split, _join, set_widget_tooltip
+from ..sorting import SortDialog, sort_records
 
 class CardEditor(QWidget):
     """Search, edit, preview, save, export, and delete card records."""
@@ -55,6 +59,7 @@ class CardEditor(QWidget):
         self._load_data()
         self._load_models()
         self._build_ui()
+        self._refresh_order_list()
         self._select_index(0 if self.rows else -1)
 
     # Startup data and page layout
@@ -77,34 +82,79 @@ class CardEditor(QWidget):
                 continue
 
     def _build_ui(self):
-        """Create the selection header, editable form, and preview splitter."""
+        """Create the left selection/order panel and editor/preview area."""
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 20, 24, 20)
-        root.addWidget(self._build_header())
         splitter = QSplitter(Qt.Horizontal)
-        splitter.addWidget(self._build_form())
-        splitter.addWidget(self._build_preview())
-        splitter.setSizes([600, 500])
+        splitter.addWidget(self._build_sidebar())
+
+        content = QSplitter(Qt.Horizontal)
+        content.addWidget(self._build_form())
+        content.addWidget(self._build_preview())
+        content.setSizes([600, 260])
+        content.setStretchFactor(0, 1)
+        content.setStretchFactor(1, 0)
+        splitter.addWidget(content)
+        splitter.setSizes([300, 860])
         root.addWidget(splitter, 1)
+
+    def _build_sidebar(self):
+        """Build card selection controls and the draggable card-order list."""
+        sidebar = QWidget()
+        sidebar.setMinimumWidth(220)
+        layout = QVBoxLayout(sidebar)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self._build_header())
+
+        order_box = QGroupBox("Card order")
+        order_layout = QVBoxLayout(order_box)
+        self.order_list = QListWidget()
+        self.order_list.setDragDropMode(QAbstractItemView.InternalMove)
+        self.order_list.setDefaultDropAction(Qt.MoveAction)
+        self.order_list.setDragDropOverwriteMode(False)
+        self.order_list.setDropIndicatorShown(True)
+        self.order_list.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.order_list.setToolTip("Drag cards to change their order in cards.csv.")
+        self.order_list.model().rowsMoved.connect(self._order_list_moved)
+        order_layout.addWidget(self.order_list, 1)
+
+        order_actions = QHBoxLayout()
+        load_selected = QPushButton("Load")
+        load_selected.setToolTip("Load the card selected in the order list.")
+        load_selected.clicked.connect(self._load_order_selection)
+        order_actions.addWidget(load_selected, 1)
+        save_order = QPushButton("Save order")
+        save_order.setToolTip("Save the card order to cards.csv.")
+        save_order.clicked.connect(self._save_order)
+        order_actions.addWidget(save_order, 1)
+        sort = QPushButton("Sort")
+        sort.setToolTip("Sort cards by one or more attributes.")
+        sort.clicked.connect(self._sort_cards)
+        order_actions.addWidget(sort, 1)
+        order_layout.addLayout(order_actions)
+        layout.addWidget(order_box, 1)
+        return sidebar
 
     # Card form construction
 
     def _build_header(self):
         """Build the searchable card selector and new-card actions."""
         box = QGroupBox("Card selection")
-        layout = QHBoxLayout(box)
+        layout = QVBoxLayout(box)
         self.search = NoWheelComboBox()
         self.search.setEditable(True)
         self.search.setPlaceholderText("Search cards by name...")
         self.search.setToolTip("Search existing cards by name, then load one to edit.")
         self.search.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.search.lineEdit().textEdited.connect(self._filter_cards)
-        layout.addWidget(self.search, 1)
+        search_row = QHBoxLayout()
+        search_row.addWidget(self.search, 1)
         edit = QPushButton("Edit")
         edit.setText("Load")
         edit.setToolTip("Load the card currently selected in the search field.")
         edit.clicked.connect(self._search_activated)
-        layout.addWidget(edit)
+        search_row.addWidget(edit)
+        layout.addLayout(search_row)
         new = QPushButton("+ New card")
         new.setToolTip("Clear the form and start a new card record.")
         new.clicked.connect(self._new_card)
@@ -282,9 +332,9 @@ class CardEditor(QWidget):
         """Build the preview surface and save/export actions."""
         box = QGroupBox("Live preview")
         layout = QVBoxLayout(box)
-        self.preview = QLabel("Select a card")
+        self.preview = AspectRatioPixmapLabel("Select a card")
         self.preview.setAlignment(Qt.AlignCenter)
-        self.preview.setMinimumSize(300, 420)
+        self.preview.setMinimumSize(200, 320)
         self.preview.setStyleSheet("background: #e8edf5;")
         self.preview.setToolTip("Live card preview. Changes appear here before you save or export.")
         layout.addWidget(self.preview, 1)
@@ -385,7 +435,87 @@ class CardEditor(QWidget):
         self.original = dict(self.rows[index])
         self._populate(self.original)
         self._refresh_search(self.original.get("Card Name", ""))
+        self._select_order_record(self.rows[index])
         self._render_preview()
+
+    def _refresh_order_list(self, selected_record=None):
+        """Rebuild the order list while retaining the active record selection."""
+        if selected_record is None and 0 <= self.current_index < len(self.rows):
+            selected_record = self.rows[self.current_index]
+        self.order_list.clear()
+        self._order_records = {}
+        selected_item = None
+        for row in self.rows:
+            name = strip_rich_text_tags(row.get("Card Name", "")).strip()
+            item = QListWidgetItem(name or "(unnamed card)")
+            record_id = id(row)
+            self._order_records[record_id] = row
+            item.setData(Qt.UserRole, record_id)
+            self.order_list.addItem(item)
+            if row is selected_record:
+                selected_item = item
+        if selected_item is not None:
+            self.order_list.setCurrentItem(selected_item)
+        else:
+            self.order_list.setCurrentRow(-1)
+
+    def _select_order_record(self, row):
+        """Highlight the row corresponding to the card currently in the form."""
+        for index in range(self.order_list.count()):
+            item = self.order_list.item(index)
+            if item.data(Qt.UserRole) == id(row):
+                self.order_list.setCurrentItem(item)
+                return
+
+    def _sync_rows_from_order_list(self):
+        """Apply the visible list order to the in-memory CSV rows."""
+        active_record = self.rows[self.current_index] if 0 <= self.current_index < len(self.rows) else None
+        self.rows = [self._order_records[self.order_list.item(index).data(Qt.UserRole)] for index in range(self.order_list.count())]
+        if active_record is not None:
+            self.current_index = next((index for index, row in enumerate(self.rows) if row is active_record), -1)
+        self._refresh_search(self.original.get("Card Name", "") if self.current_index >= 0 else self.search.currentText())
+
+    def _order_list_moved(self, *args):
+        """Keep the editor's record indices synchronized with drag-and-drop."""
+        self._sync_rows_from_order_list()
+
+    def _load_order_selection(self):
+        """Load the selected card from the order list after dirty-state checks."""
+        item = self.order_list.currentItem()
+        if item is None:
+            return
+        row = self._order_records.get(item.data(Qt.UserRole))
+        if row is None:
+            return
+        index = next((index for index, candidate in enumerate(self.rows) if candidate is row), -1)
+        if index >= 0 and self._confirm_navigation():
+            self._select_index(index)
+
+    def _save_order(self):
+        """Persist the reordered card rows without serializing current form edits."""
+        self._sync_rows_from_order_list()
+        try:
+            self.repository.save_cards(self.rows, self.fieldnames)
+        except (OSError, csv.Error) as error:
+            QMessageBox.critical(self, "Could not save card order", str(error))
+            return
+        self._refresh_order_list()
+        QMessageBox.information(self, "Card order saved", "The card order was saved to cards.csv.")
+
+    def _sort_cards(self):
+        dialog = SortDialog(self.fieldnames or CARD_FIELDS, "Cards", self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+
+        active_record = self.rows[self.current_index] if 0 <= self.current_index < len(self.rows) else None
+        self.rows = sort_records(self.rows, dialog.sort_specifications())
+        if active_record is not None:
+            self.current_index = next((index for index, row in enumerate(self.rows) if row is active_record), -1)
+        self._refresh_order_list(active_record)
+        search_text = self.original.get("Card Name", "") if self.current_index >= 0 else self.search.currentText()
+        self._refresh_search(search_text)
+        if dialog.save_on_apply:
+            self._save_order()
 
     def _populate(self, row):
         """Populate every editor control from one CSV row."""
@@ -471,8 +601,7 @@ class CardEditor(QWidget):
         try:
             image = cards.create_card(row)
             pixmap = QPixmap.fromImage(ImageQt(image))
-            scaled = pixmap.scaled(self.preview.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            self.preview.setPixmap(scaled)
+            self.preview.set_source_pixmap(pixmap)
         except Exception as error:
             self.preview.clear()
             self.preview.setText(f"Preview unavailable: {error}")
@@ -513,18 +642,14 @@ class CardEditor(QWidget):
         self._populate(new_row)
         self.art.setText("")
         self._refresh_search("")
+        self.order_list.setCurrentRow(-1)
         self._render_preview()
 
     # Save, export, and delete actions
 
     def _choose_art(self):
         """Choose art from the configured card-art directory."""
-        filename, _ = QFileDialog.getOpenFileName(
-            self,
-            "Choose card art",
-            str(ASSET_PATH),
-            "Images (*.png *.jpg *.jpeg)",
-        )
+        filename, _ = QFileDialog.getOpenFileName(self, "Choose card art", str(ASSET_PATH), "Images (*.png *.jpg *.jpeg)")
         if filename:
             selected = Path(filename)
             display_path = selected.name if selected.parent.resolve() == ASSET_PATH.resolve() else str(selected)
@@ -554,11 +679,13 @@ class CardEditor(QWidget):
         try:
             self.repository.save_cards(self.rows, self.fieldnames)
         except (OSError, csv.Error) as error:
+            self._refresh_order_list(row)
             QMessageBox.critical(self, "Could not save cards", str(error))
             return False
         self.original = dict(row)
         self._refresh_search(row["Card Name"])
         self._refresh_background_suggestions(self.background.currentText())
+        self._refresh_order_list(row)
         if export:
             try:
                 image = cards.create_card(row)
@@ -606,3 +733,4 @@ class CardEditor(QWidget):
     def _save_rows(self):
         """Persist the in-memory card list using the original CSV columns."""
         self.repository.save_cards(self.rows, self.fieldnames)
+        self._refresh_order_list()

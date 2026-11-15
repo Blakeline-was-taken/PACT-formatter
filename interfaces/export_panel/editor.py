@@ -16,12 +16,12 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QListWidget,
     QListWidgetItem,
     QMessageBox,
     QPushButton,
     QScrollArea,
     QSizePolicy,
+    QSplitter,
     QVBoxLayout,
     QWidget,
 )
@@ -30,7 +30,7 @@ from model import sigils
 from ..card_editor.data import CARDS_PATH, parse_card_tags
 from ..gui_helpers import ColorPickerButton, NoWheelComboBox, ROOT, open_folder, set_widget_tooltip
 from ..sigil_trait_editor.data import SIGIL_PATH, TRAIT_PATH
-from ..tag_data import TAG_OPTIONS, TAG_TOOLTIPS
+from ..tag_data import CARD_TAG_OPTIONS, CARD_TAG_TOOLTIPS, SIGIL_TRAIT_TAG_OPTIONS, SIGIL_TRAIT_TAG_TOOLTIPS
 from .data import (
     COST_FILTERS,
     EXPORT_TYPES,
@@ -83,10 +83,7 @@ class ExportPanel(QWidget):
         self.item_type = "Cards"
         self.settings = QSettings("Blakeline-was-taken", "PACT Formatter")
         default_output_dir = str(ROOT / "exports")
-        self.output_dirs = {
-            item_type: str(self.settings.value(f"exportDirectories/{item_type}", default_output_dir))
-            for item_type in EXPORT_TYPES
-        }
+        self.output_dirs = {item_type: str(self.settings.value(f"exportDirectories/{item_type}", default_output_dir)) for item_type in EXPORT_TYPES}
         self.selected = {}
         self.selected_list_items = {}
         self.visible_rows = []
@@ -103,13 +100,16 @@ class ExportPanel(QWidget):
         self._set_type_content()
 
     def _build_ui(self):
-        root = QHBoxLayout(self)
+        root = QVBoxLayout(self)
         root.setContentsMargins(16, 16, 16, 16)
-        root.setSpacing(12)
+        root.setSpacing(0)
+        splitter = QSplitter(Qt.Horizontal)
+        splitter.setHandleWidth(8)
+        splitter.setChildrenCollapsible(False)
+        self.main_splitter = splitter
 
         filter_column = QWidget()
         filter_column.setMinimumWidth(220)
-        filter_column.setMaximumWidth(300)
         filter_column.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
         filter_column_layout = QVBoxLayout(filter_column)
         filter_column_layout.setContentsMargins(0, 0, 0, 0)
@@ -152,22 +152,16 @@ class ExportPanel(QWidget):
         self.filter_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.filter_scroll.setWidget(self.filter_content)
         filter_column_layout.addWidget(self.filter_scroll, 1)
-        root.addWidget(filter_column)
+        self.filter_column = filter_column
+        splitter.addWidget(filter_column)
 
         self.collection_column = QWidget()
         collection_layout = QVBoxLayout(self.collection_column)
         collection_layout.setContentsMargins(0, 0, 0, 0)
-        collection_layout.setSpacing(10)
-        title = QLabel("Export")
-        title.setObjectName("pageTitle")
-        collection_layout.addWidget(title)
-        description = QLabel("Filter the available data, select the items to export, then export them together.")
-        description.setObjectName("pageDescription")
-        description.setWordWrap(True)
-        collection_layout.addWidget(description)
+        collection_layout.setSpacing(8)
 
         result_header = QHBoxLayout()
-        result_title = QLabel("Available items")
+        result_title = QLabel("Available Items")
         result_title.setObjectName("sectionTitle")
         self.result_count = QLabel()
         self.result_count.setObjectName("mutedText")
@@ -205,14 +199,21 @@ class ExportPanel(QWidget):
         self.results.selectionDragFinished.connect(self._finish_result_drag_selection)
         self.results.resized.connect(self._update_result_columns)
         collection_layout.addWidget(self.results, 1)
-        root.addWidget(self.collection_column, 1)
-        root.addWidget(self._build_sidebar())
+        self.collection_column.setMinimumWidth(440)
+        self.collection_column.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Expanding)
+        splitter.addWidget(self.collection_column)
+        self.selected_panel = self._build_sidebar()
+        splitter.addWidget(self.selected_panel)
+        splitter.setSizes([298, 600, 362])
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        splitter.setStretchFactor(2, 0)
+        root.addWidget(splitter, 1)
 
     def _build_sidebar(self):
         sidebar = QGroupBox("Selected items")
         sidebar.setToolTip("Items selected for the next export. Drag across items in the collection to select them.")
         sidebar.setMinimumWidth(250)
-        sidebar.setMaximumWidth(340)
         layout = QVBoxLayout(sidebar)
         self.selected_count = QLabel("0 selected")
         self.selected_count.setToolTip("Number of items currently selected for export.")
@@ -235,13 +236,14 @@ class ExportPanel(QWidget):
     def _change_type(self, item_type):
         if item_type == self.item_type:
             return
-        if self.selected and QMessageBox.question(
+        question = QMessageBox.question(
             self,
             "Clear selected items?",
             f"Switching to {item_type.lower()} will clear your {self.item_type.lower()} selection. Continue?",
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No,
-        ) != QMessageBox.Yes:
+        )
+        if self.selected and question != QMessageBox.Yes:
             self.type_combo.blockSignals(True)
             self.type_combo.setCurrentText(self.item_type)
             self.type_combo.blockSignals(False)
@@ -433,11 +435,11 @@ class ExportPanel(QWidget):
             self.stat_controls[stat] = (operator, value)
 
         for category, field in (
-            ("Sigils", "Sigils"),
-            ("Traits", "Traits"),
-            ("Tribes", "Tribes"),
-            ("Artists", "Credit"),
-        ):
+                ("Sigils", "Sigils"),
+                ("Traits", "Traits"),
+                ("Tribes", "Tribes"),
+                ("Artists", "Credit"),
+            ):
             box = self._filter_box(category)
             values = []
             for card in self.cards:
@@ -460,7 +462,7 @@ class ExportPanel(QWidget):
             setattr(self, f"{category.lower()}_only", only_check)
 
         tags = self._filter_box("Tags")
-        self.card_tag_filter = SelectedValues(TAG_OPTIONS, "Search tags...", option_tooltips=TAG_TOOLTIPS)
+        self.card_tag_filter = SelectedValues(CARD_TAG_OPTIONS, "Search tags...", option_tooltips=CARD_TAG_TOOLTIPS)
         self.card_tag_filter.setToolTip("Filter by known or custom tags. Background, symbols, and extra cells have separate filters below.")
         self.card_tag_filter.changed.connect(self._schedule_results_refresh)
         self._labeled_filter("General tags", self.card_tag_filter, tags)
@@ -496,14 +498,11 @@ class ExportPanel(QWidget):
 
     def _build_item_filters(self, rows):
         data = self._filter_box(f"{self.item_type[:-1]} Data")
-        self.item_name_filter = self._autocomplete(
-            (_display_name(row.get("Name", "")) for row in rows),
-            f"Search {self.item_type[:-1].lower()} name...",
-        )
+        self.item_name_filter = self._autocomplete((_display_name(row.get("Name", "")) for row in rows), f"Search {self.item_type[:-1].lower()} name...")
         self.item_name_filter.setToolTip(f"Show {self.item_type.lower()} whose names contain this text.")
         self._labeled_filter(f"{self.item_type[:-1]} Name", self.item_name_filter, data)
         tags = self._filter_box("Tags")
-        self.item_tag_filter = SelectedValues(TAG_OPTIONS, "Search tags...", option_tooltips=TAG_TOOLTIPS)
+        self.item_tag_filter = SelectedValues(SIGIL_TRAIT_TAG_OPTIONS, "Search tags...", option_tooltips=SIGIL_TRAIT_TAG_TOOLTIPS)
         self.item_tag_filter.setToolTip(f"Filter {self.item_type.lower()} by known or custom tags.")
         self.item_tag_filter.changed.connect(self._schedule_results_refresh)
         self._labeled_filter("Select tags", self.item_tag_filter, tags)
@@ -576,12 +575,12 @@ class ExportPanel(QWidget):
                 if len(requested_symbols) == 1 and not any(requested_symbols[0] in symbol for symbol in available_symbols):
                     continue
                 if len(requested_symbols) == 2 and not any(
-                    requested_symbols[0] in first and requested_symbols[1] in second
-                    or requested_symbols[1] in first and requested_symbols[0] in second
-                    for first_index, first in enumerate(available_symbols)
-                    for second_index, second in enumerate(available_symbols)
-                    if first_index != second_index
-                ):
+                        requested_symbols[0] in first and requested_symbols[1] in second
+                        or requested_symbols[1] in first and requested_symbols[0] in second
+                        for first_index, first in enumerate(available_symbols)
+                        for second_index, second in enumerate(available_symbols)
+                        if first_index != second_index
+                    ):
                     continue
                 rows.append(row)
             return rows
@@ -785,20 +784,10 @@ class ExportPanel(QWidget):
         output_dir = str(self._active_output_dir)
         if errors:
             details = (f"Warnings:\n{warnings}\n\n" if warnings else "") + f"Errors:\n{errors}"
-            dialog = ExportSummaryDialog(
-                "Export completed with errors",
-                f"Exported {succeeded} of {total} items; {failed} failed.",
-                details,
-                self,
-            )
+            dialog = ExportSummaryDialog("Export completed with errors", f"Exported {succeeded} of {total} items; {failed} failed.", details, self)
             dialog.exec()
         elif warnings:
-            dialog = ExportSummaryDialog(
-                "Export completed with warnings",
-                f"Exported {succeeded} {self.item_type.lower()} with warnings to:\n{output_dir}",
-                f"Warnings:\n{warnings}",
-                self,
-            )
+            dialog = ExportSummaryDialog("Export completed with warnings", f"Exported {succeeded} {self.item_type.lower()} with warnings to:\n{output_dir}", f"Warnings:\n{warnings}", self)
             dialog.exec()
         if succeeded:
             answer = QMessageBox.question(

@@ -279,6 +279,7 @@ class ExportResultsModel(QAbstractListModel):
                     item_name = row.get("Card Name", row.get("Name", "Item"))
                     self.icons[key] = QIcon()
                     self.previewFailed.emit(item_name, str(error) or type(error).__name__)
+
             elif self.item_type == "Cards":
                 art_path = ASSET_PATH / (row.get("Art File") or "")
                 if art_path.is_file():
@@ -286,14 +287,17 @@ class ExportResultsModel(QAbstractListModel):
                     self.icons[key] = QIcon(_framed_card_pixmap(_crop_card_art(pixmap), row.get("Temple", "")))
                 else:
                     self.icons[key] = QIcon()
+
             elif self.item_type == "Sigils":
                 icon_path = SIGIL_ICON_DIR / f"{normalize_sigil_name(row.get('Name', ''))}.png"
                 if icon_path.is_file():
                     self.icons[key] = QIcon(QPixmap(str(icon_path)))
                 else:
                     self.icons[key] = QIcon()
+
             else:
                 self.icons[key] = QIcon()
+                
         return self.icons[key]
 
 

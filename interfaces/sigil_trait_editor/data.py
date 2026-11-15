@@ -4,7 +4,6 @@ import csv
 
 from model import DEFAULT_CONFIG
 from ..gui_helpers import ROOT, _join, _split
-from ..tag_data import TAG_OPTIONS as SIGIL_TAG_OPTIONS
 
 SIGIL_PATH = ROOT / DEFAULT_CONFIG["sigils_file_path"]
 TRAIT_PATH = ROOT / DEFAULT_CONFIG["traits_file_path"]
@@ -38,14 +37,27 @@ class SigilTraitRepository:
         return {section: _csv_rows(path) for section, path in self.paths.items()}
 
     def write_item(self, data, old_name, name, item, target_section):
-        """Replace an existing item or rename it, then persist both item files."""
+        """Replace or move an item while retaining its position when possible."""
         updated = {}
         replaced_names = {name}
         if old_name:
             replaced_names.add(old_name)
+        source_section = None
+        source_index = None
+        if old_name:
+            for section in ("Sigils", "Traits"):
+                source_index = next((index for index, row in enumerate(data[section]) if row.get("Name") == old_name), None)
+                if source_index is not None:
+                    source_section = section
+                    break
         for section in ("Sigils", "Traits"):
             updated[section] = [row for row in data[section] if row.get("Name") not in replaced_names]
-        updated[target_section].append({"Name": name, "Description": item["Description"], "Tags": item["Tags"]})
+        new_row = {"Name": name, "Description": item["Description"], "Tags": item["Tags"]}
+        if source_section == target_section and source_index is not None:
+            insertion_index = sum(row.get("Name") not in replaced_names for row in data[source_section][:source_index])
+            updated[target_section].insert(insertion_index, new_row)
+        else:
+            updated[target_section].append(new_row)
         self.save_items(updated)
         return updated
 

@@ -152,19 +152,12 @@ SUBSECTION_FIELDS = {
     },
 }
 
-TEMPLATE_DEFAULTS = {
-    **{
-        key: value
-        for section in TEMPLATE_SECTIONS.values()
-        for key, value in section.items()
-    },
-    **{
-        key: value
-        for subsections in SUBSECTION_FIELDS.values()
-        for fields in subsections.values()
-        for key, value in fields.items()
-    },
-}
+TEMPLATE_DEFAULTS = {}
+for section in TEMPLATE_SECTIONS.values():
+    TEMPLATE_DEFAULTS.update(section)
+for subsections in SUBSECTION_FIELDS.values():
+    for fields in subsections.values():
+        TEMPLATE_DEFAULTS.update(fields)
 
 
 def layer_paths(temple, tier, modifier):

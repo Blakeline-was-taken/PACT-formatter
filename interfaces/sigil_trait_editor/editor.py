@@ -1,16 +1,21 @@
 """Qt interface for editing and previewing sigils and traits."""
 
+import csv
 import shutil
 from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QDialog,
     QFileDialog,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QMessageBox,
     QPushButton,
     QScrollArea,
@@ -23,6 +28,7 @@ from PySide6.QtWidgets import (
 from model import DEFAULT_CONFIG, sigils
 from ..gui_helpers import (
     Gemification,
+    AspectRatioPixmapLabel,
     NoWheelComboBox,
     ROOT,
     _split,
@@ -37,7 +43,9 @@ from .data import (
     SigilTraitRepository,
     normalize_sigil_name,
 )
+from ..tag_data import SIGIL_TRAIT_TAG_OPTIONS
 from ..card_editor.fields import TagList
+from ..sorting import SortDialog, sort_records
 
 class SigilTraitEditor(QWidget):
     """Search, edit, preview, and save sigils and traits from their shared CSV files."""
@@ -53,6 +61,7 @@ class SigilTraitEditor(QWidget):
         self.loading = False
         self._build_ui()
         self._refresh_search()
+        self._refresh_order_list()
         names = self._names_for_current_section()
         self._select_name(names[0] if names else "")
 
@@ -63,22 +72,67 @@ class SigilTraitEditor(QWidget):
         return [row.get("Name", "") for row in self.data.get(self.current_section, []) if row.get("Name")]
 
     def _build_ui(self):
-        """Arrange selection controls, the editor form, and preview side by side."""
+        """Arrange the selection/order panel beside the form and preview."""
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 20, 24, 20)
-        root.addWidget(self._build_header())
         splitter = QSplitter(Qt.Horizontal)
-        splitter.addWidget(self._build_form())
-        splitter.addWidget(self._build_preview())
-        splitter.setSizes([560, 500])
+        splitter.addWidget(self._build_sidebar())
+
+        content = QSplitter(Qt.Horizontal)
+        content.addWidget(self._build_form())
+        content.addWidget(self._build_preview())
+        content.setSizes([560, 260])
+        content.setStretchFactor(0, 1)
+        content.setStretchFactor(1, 0)
+        splitter.addWidget(content)
+        splitter.setSizes([300, 860])
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
         root.addWidget(splitter, 1)
+
+    def _build_sidebar(self):
+        """Build the existing selectors and a draggable sigil/trait order list."""
+        sidebar = QWidget()
+        sidebar.setMinimumWidth(220)
+        layout = QVBoxLayout(sidebar)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self._build_header())
+
+        order_box = QGroupBox("Item order")
+        order_layout = QVBoxLayout(order_box)
+        self.order_list = QListWidget()
+        self.order_list.setDragDropMode(QAbstractItemView.InternalMove)
+        self.order_list.setDefaultDropAction(Qt.MoveAction)
+        self.order_list.setDragDropOverwriteMode(False)
+        self.order_list.setDropIndicatorShown(True)
+        self.order_list.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.order_list.setToolTip("Drag items to change their order in the current CSV file.")
+        self.order_list.model().rowsMoved.connect(self._order_list_moved)
+        order_layout.addWidget(self.order_list, 1)
+
+        order_actions = QHBoxLayout()
+        load_selected = QPushButton("Load")
+        load_selected.setToolTip("Load the sigil or trait selected in the order list.")
+        load_selected.clicked.connect(self._load_order_selection)
+        order_actions.addWidget(load_selected, 1)
+        save_order = QPushButton("Save order")
+        save_order.setToolTip("Save the current collection order without saving unsaved form edits.")
+        save_order.clicked.connect(self._save_order)
+        order_actions.addWidget(save_order, 1)
+        sort = QPushButton("Sort")
+        sort.setToolTip("Sort items by one or more attributes.")
+        sort.clicked.connect(self._sort_items)
+        order_actions.addWidget(sort, 1)
+        order_layout.addLayout(order_actions)
+        layout.addWidget(order_box, 1)
+        return sidebar
 
     # Loading and selecting items
 
     def _build_header(self):
         """Create the category selector, searchable item list, and new-item action."""
         box = QGroupBox("Sigil/Trait selection")
-        layout = QHBoxLayout(box)
+        layout = QVBoxLayout(box)
         self.category = NoWheelComboBox()
         self.category.addItems(["Sigils", "Traits"])
         self.category.setToolTip("Choose which collection to search and edit.")
@@ -91,12 +145,14 @@ class SigilTraitEditor(QWidget):
         self.search.setToolTip("Search for a sigil or trait in the selected collection.")
         self.search.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.search.lineEdit().textEdited.connect(self._filter_names)
-        layout.addWidget(self.search, 1)
+        search_row = QHBoxLayout()
+        search_row.addWidget(self.search, 1)
 
         load = QPushButton("Edit")
         load.setToolTip("Load the item currently selected in the search field.")
         load.clicked.connect(self._search_activated)
-        layout.addWidget(load)
+        search_row.addWidget(load)
+        layout.addLayout(search_row)
 
         new = QPushButton("+ New item")
         new.setToolTip("Clear the form and start a new sigil or trait.")
@@ -179,7 +235,7 @@ class SigilTraitEditor(QWidget):
         conduit_icon_layout.addWidget(self.conduit_icon_edit, 1)
         conduit_icon_layout.addWidget(conduit_choose_icon)
 
-        self.tags = TagList()
+        self.tags = TagList(SIGIL_TRAIT_TAG_OPTIONS)
         self.tags.setToolTip("Add known or custom tags.")
         self.tags.changed.connect(self._changed)
         form.addRow("Tags", self.tags)
@@ -203,9 +259,9 @@ class SigilTraitEditor(QWidget):
         box = QGroupBox("Live preview")
         layout = QVBoxLayout(box)
 
-        self.preview = QLabel("Select an item")
+        self.preview = AspectRatioPixmapLabel("Select an item")
         self.preview.setAlignment(Qt.AlignCenter)
-        self.preview.setMinimumSize(320, 420)
+        self.preview.setMinimumSize(200, 320)
         self.preview.setStyleSheet("background: #e8edf5;")
         self.preview.setToolTip("Live card preview showing this item in a sample card.")
         layout.addWidget(self.preview, 1)
@@ -245,6 +301,8 @@ class SigilTraitEditor(QWidget):
         self.current_section = section
         self._update_conduit_icon_visibility()
         self._refresh_search()
+        self._refresh_order_list()
+        self.order_list.setCurrentRow(-1)
 
     def _refresh_search(self, text=""):
         """Rebuild the searchable name list while retaining the selected text."""
@@ -253,6 +311,74 @@ class SigilTraitEditor(QWidget):
         self.search.addItems(self._names_for_current_section())
         self.search.setCurrentText(text)
         self.search.blockSignals(False)
+
+    def _refresh_order_list(self, selected_row=None):
+        """Rebuild the order list for the active collection."""
+        if selected_row is None:
+            selected_row = None
+            for row in self.data.get(self.current_section, []):
+                if row.get("Name") == self.current_name:
+                    selected_row = row
+                    break
+        self.order_list.clear()
+        self._order_records = {}
+        selected_item = None
+        for row in self.data.get(self.current_section, []):
+            name = row.get("Name", "")
+            item = QListWidgetItem(name or "(unnamed item)")
+            record_id = id(row)
+            self._order_records[record_id] = row
+            item.setData(Qt.UserRole, record_id)
+            self.order_list.addItem(item)
+            if row is selected_row:
+                selected_item = item
+        if selected_item is not None:
+            self.order_list.setCurrentItem(selected_item)
+        else:
+            self.order_list.setCurrentRow(-1)
+
+    def _sync_items_from_order_list(self):
+        """Apply the visible list order to the active in-memory collection."""
+        self.data[self.current_section] = [self._order_records[self.order_list.item(index).data(Qt.UserRole)] for index in range(self.order_list.count())]
+        self._refresh_search(self.search.currentText())
+
+    def _order_list_moved(self, *args):
+        """Keep the active collection synchronized with drag-and-drop order."""
+        self._sync_items_from_order_list()
+
+    def _load_order_selection(self):
+        """Load the selected record from the order list."""
+        item = self.order_list.currentItem()
+        if item is not None:
+            row = self._order_records.get(item.data(Qt.UserRole))
+            if row is not None:
+                self._select_row(row)
+
+    def _save_order(self):
+        """Persist the active collection order without serializing form edits."""
+        self._sync_items_from_order_list()
+        try:
+            self.repository.save_items(self.data)
+        except (OSError, csv.Error) as error:
+            QMessageBox.critical(self, "Could not save item order", str(error))
+            return
+        self._refresh_order_list()
+        QMessageBox.information(self, "Item order saved", f"The {self.current_section.lower()} order was saved.")
+
+    def _sort_items(self):
+        rows = self.data.get(self.current_section, [])
+        columns = list(rows[0].keys()) if rows else ["Name", "Description", "Tags"]
+        dialog = SortDialog(columns, self.current_section, self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+
+        current_item = self.order_list.currentItem()
+        active_record = (self._order_records.get(current_item.data(Qt.UserRole)) if current_item is not None else None)
+        self.data[self.current_section] = sort_records(rows, dialog.sort_specifications())
+        self._refresh_search(self.search.currentText())
+        self._refresh_order_list(active_record)
+        if dialog.save_on_apply:
+            self._save_order()
 
     def _filter_names(self, text):
         """Show only active-section names containing the current query."""
@@ -275,12 +401,20 @@ class SigilTraitEditor(QWidget):
         if not name:
             self._new_item()
             return
-        self.current_name = name
         row = next((item for item in self.data[self.current_section] if item.get("Name") == name), {})
+        self._select_row(row)
+
+    def _select_row(self, row):
+        """Populate the editor from one exact row in the active collection."""
+        name = row.get("Name", "")
+        if not name:
+            return
+        self.current_name = name
         self.original = dict(row)
         self.original["Type"] = "Sigil" if self.current_section == "Sigils" else "Trait"
         self._populate(row)
         self._refresh_search(name)
+        self._refresh_order_list(row)
         self._render_preview()
 
     # Preview construction and rendering
@@ -290,12 +424,8 @@ class SigilTraitEditor(QWidget):
         self.current_name = ""
         self.original = {}
         item_type = "Sigil" if self.current_section == "Sigils" else "Trait"
-        self._populate({
-            "Name": "",
-            "Description": "",
-            "Tags": "",
-            "Type": item_type,
-        })
+        self._populate({"Name": "", "Description": "", "Tags": "", "Type": item_type})
+        self.order_list.setCurrentRow(-1)
         self._render_preview()
 
     def _populate(self, row):
@@ -325,11 +455,7 @@ class SigilTraitEditor(QWidget):
 
     def _update_conduit_icon_visibility(self):
         """Offer conduit-image selection only for conduit sigils."""
-        is_conduit = (
-            self.current_section == "Sigils"
-            and self.type_combo.currentText() == "Sigil"
-            and any(tag.casefold() == "conduit_sigil" for tag in self.tags.values())
-        )
+        is_conduit = self.current_section == "Sigils" and self.type_combo.currentText() == "Sigil" and any(tag.casefold() == "conduit_sigil" for tag in self.tags.values())
         self.conduit_icon_row.setVisible(is_conduit)
         self.conduit_icon_label.setVisible(is_conduit)
 
@@ -422,7 +548,7 @@ class SigilTraitEditor(QWidget):
                 card_tags += ", mox_indicator"
             image = create_card_preview(sigils=row["Sigils"], traits=row["Traits"], tags=card_tags)
             pixmap = self._pixmap_for(image)
-            self.preview.setPixmap(pixmap)
+            self.preview.set_source_pixmap(pixmap)
         except Exception as error:
             self.preview.clear()
             self.preview.setText(f"Preview unavailable: {error}")
@@ -433,7 +559,7 @@ class SigilTraitEditor(QWidget):
         from PySide6.QtGui import QPixmap
         from PIL.ImageQt import ImageQt
 
-        return QPixmap.fromImage(ImageQt(image)).scaled(320, 420, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        return QPixmap.fromImage(ImageQt(image))
 
     # Icon and item actions
 
@@ -556,6 +682,8 @@ class SigilTraitEditor(QWidget):
         self.original["Type"] = target_type
         self._refresh_search(name)
         self.category.setCurrentText(target_section)
+        saved_row = next(row for row in self.data[target_section] if row.get("Name") == name)
+        self._refresh_order_list(saved_row)
         self._render_preview()
 
         # Export the matching renderer model after saving the CSV definition.
@@ -626,4 +754,5 @@ class SigilTraitEditor(QWidget):
                 QMessageBox.warning(self, "Could not delete all exports", "\n".join(failures))
         self.current_name = ""
         self._refresh_search()
+        self._refresh_order_list()
         self._new_item()

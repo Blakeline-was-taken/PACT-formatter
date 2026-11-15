@@ -141,12 +141,13 @@ def _render_sigil(item, format_name, color, color_map):
 
 
 def _sigil_export_folder(format_name):
-    return {
+    formats = {
         "Standard": "sigils",
         "Shortened": "short sigils",
         "Base game": "base game sigils",
         "Patch": "sigil patches",
-    }[format_name]
+    }
+    return formats[format_name]
 
 
 def _export_sigil(row, options, output_dir):
@@ -234,13 +235,7 @@ class _ExportTask(QRunnable):
         log_handler = _TaskLogHandler(threading.get_ident(), item_name, collect_log)
         _attach_task_log_handler(log_handler)
         try:
-            output_paths = _export_row(
-                self.row,
-                self.item_type,
-                self.options,
-                self.output_dir,
-                self.card_filename,
-            )
+            output_paths = _export_row(self.row, self.item_type, self.options, self.output_dir, self.card_filename)
             for output_path in output_paths:
                 if not output_path.is_file() or output_path.stat().st_size == 0:
                     raise OSError(f"Export output was not created: {output_path}")
@@ -291,13 +286,7 @@ class ExportJob(QObject):
             self.finished.emit(0, 0, 0, "", "")
             return
         for row in self.rows:
-            task = _ExportTask(
-                row,
-                self.item_type,
-                self.options,
-                self.output_dir,
-                self.card_filenames.get(id(row)),
-            )
+            task = _ExportTask(row, self.item_type, self.options, self.output_dir, self.card_filenames.get(id(row)))
             task.signals.completed.connect(self._item_completed)
             task.signals.message.connect(self.message)
             self._tasks.append(task)
