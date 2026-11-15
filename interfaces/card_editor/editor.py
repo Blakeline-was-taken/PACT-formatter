@@ -418,7 +418,7 @@ class CardEditor(QWidget):
         """Return unique tribe words because the renderer separates tribes by spaces."""
         values = set()
         for row in self.rows:
-            values.update(row.get("Tribes", "").replace(",", " ").split())
+            values.update((row.get("Tribes", "") or "").replace(",", " ").split())
         return sorted(values)
 
     def _suggested_field(self, options):

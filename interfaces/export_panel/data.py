@@ -42,7 +42,7 @@ def split_list(value):
 
 
 def card_filter_values(row, category, field):
-    value = row.get(field, "")
+    value = row.get(field) or ""
     if category == "Tribes":
         return value.replace(",", " ").split()
     values = split_list(value)
