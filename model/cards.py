@@ -95,8 +95,11 @@ def get_card_asset(asset_name, default_folder, temple, tier=None, bg_modifier=No
                     except (FileNotFoundError, PermissionError):
                         continue
                 continue
-    
-    return get_card_asset(asset_name, default_folder, temple, fallback_tier, bg_modifier, fallback_tier, color_tier)
+
+    if fallback_tier and tier != fallback_tier:
+        return get_card_asset(asset_name, default_folder, temple, fallback_tier, bg_modifier, fallback_tier, color_tier)
+    searched = ", ".join(str(directory / f"{prefix}{asset_name}.png") for prefix in prefixes for directory in directories)
+    raise FileNotFoundError(f"Could not find asset {asset_name!r} for temple {temple!r}, tier {tier!r}, background {bg_modifier!r}. Checked: {searched}")
 
 def get_cardback(temple, tier, bg_modifier=None, fallback_tier=None):
     return get_card_asset("bg", "cardbacks", temple, tier, bg_modifier, fallback_tier)
@@ -128,10 +131,12 @@ def get_traitline_image(temple, tier, bg_modifier, fallback_tier=None):
 
 
 def get_card_art(art_filename, temple, bg_modifier):
+    art_path = GENERAL_ASSETS_DIR / "card_art " / art_filename
     try:
-        art = Image.open(GENERAL_ASSETS_DIR / "card_art " / art_filename)
+        art = Image.open(art_path)
         return apply_temple_colors(art, temple, bg_modifier)
-    except (FileNotFoundError, PermissionError):
+    except (FileNotFoundError, PermissionError) as error:
+        logging.warning("Card art %s for temple %r is unavailable; using the placeholder: %s", art_path, temple, error)
         return Image.open(GENERAL_ASSETS_DIR / "card_art " / "_placeholder_.png")
 
 
@@ -145,7 +150,7 @@ def get_sigil_data(config, csv_dict):
     mox_provided = []
     token_id = 0
 
-    def handle_sigil_or_trait(sigil, att_list, att_dict):
+    def handle_sigil_or_trait(sigil, att_list, att_dict, item_type):
         nonlocal token_id, power_sigil, health_sigil, conduit_sigil
         item = None
         conditionals = SigilConditional.get_all_subclasses()
@@ -157,7 +162,8 @@ def get_sigil_data(config, csv_dict):
             item = att_dict[sigil].copy()
             target_obj = item
         else:
-            return 
+            card_name = csv_dict.get("Card Name", "(unnamed card)")
+            raise ValueError(f"Unknown {item_type} {sigil!r} referenced by card {card_name!r}.")
 
         att_list.append(item)
         if target_obj:
@@ -179,13 +185,13 @@ def get_sigil_data(config, csv_dict):
     trait_list = []
     try:
         for sigil in str_sigils:
-            handle_sigil_or_trait(sigil, sigil_list, sigils.SIGILS)
+            handle_sigil_or_trait(sigil, sigil_list, sigils.SIGILS, "sigil")
         for sigil in str_traits:
-            handle_sigil_or_trait(sigil, trait_list, sigils.TRAITS)
-        return sigil_list, trait_list, power_sigil, health_sigil, conduit_sigil, mox_provided
-    except KeyError as e:
-        print(f"Error: {e}")
-        logging.error(f"Error: {e}")
+            handle_sigil_or_trait(sigil, trait_list, sigils.TRAITS, "trait")
+    except KeyError as error:
+        card_name = csv_dict.get("Card Name", "(unnamed card)")
+        raise ValueError(f"Could not resolve sigils or traits for card {card_name!r}: {error}") from error
+    return sigil_list, trait_list, power_sigil, health_sigil, conduit_sigil, mox_provided
 
 
 def print_indicators(config, image, csv_dict, bg_modifier=None, mox_provided=[]):
@@ -250,7 +256,12 @@ def print_card_cost(config, image, csv_dict):
         cost_x += config["cost_right_border_gemification_displacement"]
         
     cost_images = []
-    for c in costs.get_cost(cost):
+    try:
+        parsed_costs = costs.get_cost(cost)
+    except (TypeError, ValueError) as error:
+        card_name = csv_dict.get("Card Name", "(unnamed card)")
+        raise ValueError(f"Invalid cost for card {card_name!r}: {error}") from error
+    for c in parsed_costs:
         cost_images.append(apply_temple_colors(c.getCostImage(config), csv_dict['Temple'], csv_dict['Tier']))
 
     cost_y = config['cost_bottom_border']

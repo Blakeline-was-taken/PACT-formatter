@@ -1,6 +1,7 @@
 """Parallel image rendering and file output for the export panel."""
 
 import os
+import logging
 import tempfile
 import threading
 import traceback
@@ -107,7 +108,7 @@ def _save_image(image, destination):
             try:
                 temporary_path.unlink(missing_ok=True)
             except OSError:
-                pass
+                logging.getLogger("pact").exception("Could not remove incomplete export file %s.", temporary_path)
         raise
     if not destination.is_file() or destination.stat().st_size == 0:
         raise OSError(f"Export output was not created correctly: {destination}")
@@ -244,9 +245,11 @@ class _ExportTask(QRunnable):
             self.signals.completed.emit(item_name, not errors, "\n".join(errors), "\n".join(warnings))
         except Exception as exception:
             error = traceback.format_exc()
+            context = f"Exporting {self.item_type.lower()} {item_name!r} to {self.output_dir}"
+            logging.getLogger("pact").exception(context)
             errors.append(error)
             self.signals.message.emit(item_name, "ERROR", str(exception) or type(exception).__name__)
-            self.signals.completed.emit(item_name, False, "\n".join(errors), "\n".join(warnings))
+            self.signals.completed.emit(item_name, False, f"{context}\n{error}", "\n".join(warnings))
         finally:
             _detach_task_log_handler(log_handler)
 

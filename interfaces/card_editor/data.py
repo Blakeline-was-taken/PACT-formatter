@@ -1,6 +1,7 @@
 """Card CSV access and shared card-editor data definitions."""
 
 import csv
+import logging
 from pathlib import Path
 
 from model import DEFAULT_CONFIG
@@ -17,7 +18,7 @@ CARD_FIELDS = [
     "Sigils", "Token", "Traits", "Tribes", "Flavor Text", "Credit", "Tags",
 ]
 COST_OPTIONS = [
-    "blood", "bones", "energy", "max",
+    "blood", "bones", "energy", "max", "free",
     "emerald", "sapphire", "ruby", "prism",
     "shattered emerald", "shattered sapphire", "shattered ruby", "shattered prism",
     "asterisk",
@@ -137,6 +138,7 @@ class CardRepository:
             with (self.data_path / filename).open(newline="", encoding="utf-8") as handle:
                 return [row[key] for row in csv.DictReader(handle) if row.get(key)]
         except (OSError, csv.Error, KeyError):
+            logging.getLogger("pact").exception("Could not load suggestions from %s (column %r).", self.data_path / filename, key)
             return []
 
     def save_cards(self, rows, fieldnames):

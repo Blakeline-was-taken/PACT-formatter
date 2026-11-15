@@ -91,7 +91,8 @@ class Sigil:
             path = get_outline_asset(path)
         try:
             sigil_img = Image.open(path).convert("RGBA")
-        except FileNotFoundError as e:
+        except FileNotFoundError as error:
+            logging.warning("Sigil icon %s for %r is missing; using the fallback icon: %s", path, self.name, error)
             path = SIGIL_DIR / "X.png"
             if not config["allow_colored_sigils"] or color != "black":
                 path = get_outline_asset(path)

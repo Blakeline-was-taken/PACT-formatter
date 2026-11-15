@@ -224,7 +224,7 @@ class CostList(ElementList):
         value = self._input_text().strip()
         if not value:
             return
-        row = CostRow(value, enabled=value not in ("asterisk", "free"))
+        row = CostRow(value, enabled=value.casefold() not in ("asterisk", "free"))
         row.changed.connect(self.changed)
         self.items.add_row(row)
         self._clear_input()
@@ -251,7 +251,7 @@ class CostList(ElementList):
                 amount, resource = 1, value.strip()
             if "_" in value:
                 amount, resource = 0, value.strip()
-            row = CostRow(resource, amount, enabled="_" not in value and resource not in ("asterisk", "free"))
+            row = CostRow(resource, amount, enabled="_" not in value and resource.casefold() not in ("asterisk", "free"))
             row.changed.connect(self.changed)
             self.items.add_row(row)
 
@@ -266,7 +266,7 @@ class CostList(ElementList):
                 result.append("*")
             elif "_" in resource:
                 result.append(resource)
-            elif resource == "free":
+            elif resource.casefold() == "free":
                 result.append("free")
             else:
                 result.append(f"{row.amount.value()} {resource}")

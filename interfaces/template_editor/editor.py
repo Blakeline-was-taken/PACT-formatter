@@ -35,6 +35,7 @@ from ..gui_helpers import (
     create_card_preview,
     set_widget_tooltip,
 )
+from ..error_handling import exception_details, log_exception, show_error
 from .data import (
     COORDINATE_FIELDS,
     SUBSECTION_FIELDS,
@@ -160,13 +161,13 @@ class TemplateEditor(QWidget):
         self._editing_color_key = None
         self._color_entries = []
         self._loading_color_editor = False
-        self._config_tree = self._read_config()
+        self._config_tree = {}
 
         try:
             cards_path = ROOT / DEFAULT_CONFIG["cards_file_path"]
             self._temple_options, self._tier_options, self._modifier_options = read_selector_values(cards_path)
         except (OSError, csv.Error) as error:
-            QMessageBox.critical(self, "Could not load template options", str(error))
+            show_error(self, "Could not load template options", f"Could not read template selector values from {cards_path}.", error)
             self._temple_options, self._tier_options, self._modifier_options = [], [], []
 
         self._build_ui()
@@ -175,12 +176,8 @@ class TemplateEditor(QWidget):
     # Configuration and main editor layout
 
     def _read_config(self):
-        """Load configuration and display a dialog before propagating read errors."""
-        try:
-            return read_config()
-        except (OSError, json.JSONDecodeError) as error:
-            QMessageBox.critical(self, "Could not load configuration", str(error))
-            raise
+        """Load the configuration tree from the shared configuration file."""
+        return read_config()
 
     def _build_ui(self):
         """Arrange the selector header above the settings and preview panes."""
@@ -750,7 +747,7 @@ class TemplateEditor(QWidget):
             # Start with defaults, then apply values inherited from this layer path.
             values = {key: self._effective_values.get(key, default_value) for key, default_value in TEMPLATE_DEFAULTS.items()}
         except (OSError, json.JSONDecodeError, ValueError) as error:
-            QMessageBox.critical(self, "Could not load template settings", str(error))
+            show_error(self, "Could not load template settings", f"Could not load the {selection} configuration layer from {ROOT / 'config.json'}.", error)
             return
 
         self._loaded_selection = selection
@@ -764,7 +761,8 @@ class TemplateEditor(QWidget):
         text_colors = self._effective_values.get("text_colors", {})
         if not isinstance(text_colors, dict):
             self._loading = False
-            QMessageBox.critical(self, "Could not load template settings", "'text_colors' must be an object.",)
+            error = ValueError("'text_colors' must be an object.")
+            show_error(self, "Could not load template settings", f"The {selection} configuration layer contains invalid rich-text colors.", error)
             return
         try:
             for name, value in text_colors.items():
@@ -773,7 +771,7 @@ class TemplateEditor(QWidget):
                 self._color_entries_from_value(name, value)
         except ValueError as error:
             self._loading = False
-            QMessageBox.critical(self, "Could not load template settings", str(error))
+            show_error(self, "Could not load template settings", f"The {selection} configuration layer contains an invalid rich-text color.", error)
             return
         self._text_colors = copy.deepcopy(text_colors)
         self._loaded_text_colors = copy.deepcopy(text_colors)
@@ -908,9 +906,15 @@ class TemplateEditor(QWidget):
             pixmap = QPixmap.fromImage(ImageQt(image))
             scaled = pixmap.scaled(320, 420, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             self.preview.setPixmap(scaled)
-        except (OSError, KeyError, ValueError, TypeError, IndexError, RuntimeError) as error:
+            self.preview.setToolTip("Live sample card rendered with the active settings. It is not an exported card.")
+        except Exception as error:
+            section = self._active_section or "Formatting"
+            subsection = self._active_subsection.get(section, "")
+            context = f"Could not render the {section.lower()}{f' / {subsection.lower()}' if subsection else ''} preview for configuration layer {self._loaded_selection}."
+            summary = log_exception(context, error)
             self.preview.clear()
-            self.preview.setText(f"Preview unavailable: {error}")
+            self.preview.setText(f"Preview unavailable.\n{summary}")
+            self.preview.setToolTip(exception_details(error))
 
     def _create_preview(self, config):
         """Build section-specific sample data and render it with the given config."""
@@ -1068,7 +1072,7 @@ class TemplateEditor(QWidget):
                         target[key] = value
             write_config(tree)
         except (OSError, json.JSONDecodeError, ValueError, TypeError) as error:
-            QMessageBox.critical(self, "Could not save template settings", str(error))
+            show_error(self, "Could not save template settings", f"Could not save template configuration layer {self._loaded_selection} to {ROOT / 'config.json'}.", error)
             return
         self._load_selection(selection)
         QMessageBox.information(self, "Template saved", "Template settings were saved.")
@@ -1100,7 +1104,7 @@ class TemplateEditor(QWidget):
                 target.clear()
             write_config(tree)
         except (OSError, json.JSONDecodeError, ValueError, TypeError) as error:
-            QMessageBox.critical(self, "Could not restore template settings", str(error))
+            show_error(self, "Could not restore template settings", f"Could not restore template configuration layer {selection} in {ROOT / 'config.json'}.", error)
             return
         self._load_selection(selection)
         QMessageBox.information(self, "Settings restored", "Template settings were restored.")

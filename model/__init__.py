@@ -1,8 +1,10 @@
-import logging, json, os
+import json, logging, os
 from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
+from interfaces.error_handling import configure_logging
 
 ROOT = Path(__file__).resolve().parent.parent
+configure_logging(ROOT / "error.log")
 
 def load_config(temple=None, tier=None, bg_modifier=None):
     config_tree = json.load(open(ROOT / "config.json", "r", encoding="utf-8"))
@@ -43,12 +45,6 @@ DEFAULT_CONFIG = load_config()
 ASSETS_DIR = ROOT / DEFAULT_CONFIG["assets_dir"]
 GENERAL_ASSETS_DIR = ASSETS_DIR / "general_assets"
 FONT = ROOT / "data" / "fonts" / f"{DEFAULT_CONFIG['font']}.TTF"
-
-logging.basicConfig(
-    filename='error.log', 
-    level=logging.ERROR, 
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
 
 def get_color_mapping(temple, tier=None, bg_modifier=None, config_override=None):
     """
