@@ -5,12 +5,13 @@ import shutil
 from pathlib import Path
 
 from PIL.ImageQt import ImageQt
-from PySide6.QtCore import QTimer, Qt
-from PySide6.QtGui import QPixmap
+from PySide6.QtCore import QRegularExpression, QTimer, Qt
+from PySide6.QtGui import QPixmap, QRegularExpressionValidator
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
     QDialog,
+    QCheckBox,
     QFileDialog,
     QFormLayout,
     QGroupBox,
@@ -310,6 +311,21 @@ class CardEditor(QWidget):
         self.tag_list.changed.connect(self._changed)
         outer.addWidget(self.tag_list)
 
+        self.display_name_enabled = QCheckBox("Override displayed name")
+        self.display_name_enabled.setToolTip("When checked, display the value below instead of Card Name.")
+        self.display_name_enabled.toggled.connect(self._changed)
+        self.display_name = QLineEdit()
+        self.display_name.setPlaceholderText("Leave blank to hide the card name")
+        self.display_name.setToolTip("Displayed card name. An empty value hides the name; commas are reserved as tag separators.")
+        self.display_name.setValidator(QRegularExpressionValidator(QRegularExpression("[^,]*"), self.display_name))
+        self.display_name.setEnabled(False)
+        self.display_name_enabled.toggled.connect(self.display_name.setEnabled)
+        self.display_name.textChanged.connect(self._changed)
+        display_name_row = QHBoxLayout()
+        display_name_row.addWidget(self.display_name_enabled)
+        display_name_row.addWidget(self.display_name, 1)
+        outer.addLayout(display_name_row)
+
         background_row = QHBoxLayout()
         background_label = QLabel("Background")
         background_label.setToolTip("Optional background modifier used to select assets and template.")
@@ -565,6 +581,8 @@ class CardEditor(QWidget):
         # Restore tags and special metadata encoded in the Tags column.
         self.extra_cell_amount.setValue(card_tags["extra_cells"])
         self.tag_list.set_values(card_tags["general_tags"])
+        self.display_name_enabled.setChecked(card_tags["display_name_enabled"])
+        self.display_name.setText(card_tags["display_name"])
         self.left_symbol.setCurrentText(card_tags["symbols"]["left"])
         self.right_symbol.setCurrentText(card_tags["symbols"]["right"])
         self.loading = False
@@ -599,6 +617,8 @@ class CardEditor(QWidget):
             self.left_symbol.currentText(),
             self.right_symbol.currentText(),
             self.extra_cell_amount.value(),
+            self.display_name.text(),
+            self.display_name_enabled.isChecked(),
         )
         return row
 

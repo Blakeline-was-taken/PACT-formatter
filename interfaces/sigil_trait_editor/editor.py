@@ -4,9 +4,11 @@ import csv
 import shutil
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QRegularExpression, Qt
+from PySide6.QtGui import QRegularExpressionValidator
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QCheckBox,
     QDialog,
     QFileDialog,
     QFormLayout,
@@ -182,6 +184,25 @@ class SigilTraitEditor(QWidget):
         self.name_edit.textChanged.connect(self._changed)
         form.addRow("Name", self.name_edit)
 
+        self.display_name_enabled = QCheckBox("Override displayed name")
+        self.display_name_enabled.setToolTip("Use an alternate displayed name for this sigil. Traits do not display a name.")
+        self.display_name_enabled.toggled.connect(self._changed)
+        self.display_name = QLineEdit()
+        self.display_name.setPlaceholderText("Leave blank to hide the sigil name")
+        self.display_name.setToolTip("Displayed sigil name. An empty value hides the name.")
+        self.display_name.setValidator(QRegularExpressionValidator(QRegularExpression("[^,]*"), self.display_name))
+        self.display_name.setEnabled(False)
+        self.display_name_enabled.toggled.connect(self.display_name.setEnabled)
+        display_name_row = QWidget()
+        display_name_layout = QHBoxLayout(display_name_row)
+        display_name_layout.setContentsMargins(0, 0, 0, 0)
+        display_name_layout.addWidget(self.display_name_enabled)
+        display_name_layout.addWidget(self.display_name, 1)
+        form.addRow("Display name", display_name_row)
+        self.display_name_row = display_name_row
+        self.display_name_label = form.labelForField(display_name_row)
+        self.display_name.textChanged.connect(self._changed)
+
         self.description_edit = QLineEdit()
         self.description_edit.setToolTip("Description shown with this sigil or trait. Supports line breaks and rich-text markup.")
         self.description_edit.textChanged.connect(self._changed)
@@ -298,6 +319,7 @@ class SigilTraitEditor(QWidget):
         """Switch between the sigil and trait collections."""
         self.current_section = section
         self._update_conduit_icon_visibility()
+        self._update_preview_visibility()
         self._refresh_search()
         self._refresh_order_list()
         self.order_list.setCurrentRow(-1)
@@ -446,7 +468,16 @@ class SigilTraitEditor(QWidget):
         conduit_icon = conduit_icon_path.name if row.get("Name") and conduit_icon_path.is_file() else ""
         self.conduit_icon_edit.setText(conduit_icon)
 
-        self.tags.set_values(_split(row.get("Tags", "")))
+        tag_values = _split(row.get("Tags", ""))
+        is_sigil = self.type_combo.currentText() == "Sigil"
+        if is_sigil:
+            display_name, display_name_enabled = sigils.parse_display_name_tag(row.get("Name", ""), tag_values)
+            tag_values = [tag for tag in tag_values if tag.partition("=")[0].strip().casefold() != "display_name"]
+        else:
+            display_name, display_name_enabled = "", False
+        self.display_name.setText(display_name if display_name_enabled else "")
+        self.display_name_enabled.setChecked(display_name_enabled)
+        self.tags.set_values(tag_values)
         self.loading = False
         self._update_conduit_icon_visibility()
         self._update_preview_visibility()
@@ -459,18 +490,24 @@ class SigilTraitEditor(QWidget):
 
     def _update_preview_visibility(self):
         """Show conditional controls only when the selected item is a sigil."""
-        item_type = self.type_combo.currentText()
-        is_sigil = item_type == "Sigil"
+        is_sigil = self.type_combo.currentText() == "Sigil"
         self.preview_condition.setVisible(is_sigil)
         is_gemified = self.preview_condition.currentText() == "Gemified"
         self.preview_gems.setVisible(is_sigil and is_gemified)
+        self.display_name_row.setVisible(is_sigil)
+        self.display_name_label.setVisible(is_sigil)
 
     def _current_data(self):
         """Collect the current form values in the CSV item shape."""
         name = self.name_edit.text().strip()
         description = self.description_edit.text().strip()
         tags = self.tags.values()
-        return {"Name": name, "Description": description, "Tags": _join(tags), "Type": self.type_combo.currentText()}
+        item_type = self.type_combo.currentText()
+        if item_type == "Sigil":
+            tags = [tag for tag in tags if tag.partition("=")[0].strip().casefold() != "display_name"]
+            if self.display_name_enabled.isChecked():
+                tags.append(f"display_name={self.display_name.text().strip()}")
+        return {"Name": name, "Description": description, "Tags": _join(tags), "Type": item_type}
 
     def _changed(self):
         """Refresh dependent controls and preview after a user edit."""

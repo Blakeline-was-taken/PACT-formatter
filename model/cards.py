@@ -21,6 +21,17 @@ def tag_values(value):
     return {tag.strip().casefold() for tag in str(value).split(",") if tag.strip()}
 
 
+def _card_display_name(csv_dict):
+    """Return a card's display_name tag value, or its configured name."""
+    for raw_tag in str(csv_dict.get("Tags", "")).split(","):
+        key, separator, value = raw_tag.strip().partition("=")
+        if key.strip().casefold() == "display_name":
+            if not separator:
+                raise ValueError("The display_name tag must use the format 'display_name=<text>'.")
+            return value.strip()
+    return csv_dict["Card Name"]
+
+
 def _font_path(config):
     return ROOT / "data" / "fonts" / f"{config.get('font', DEFAULT_CONFIG['font'])}.TTF"
 
@@ -464,20 +475,21 @@ def print_base_game_card(config, color_map, bg_modifier, image, sigil_y, csv_dic
 
 
 def write_name(config, color_map, image, draw, csv_dict):
+    card_name = _card_display_name(csv_dict)
     name_size = config['name_font_size']
     name_y = config['name_top_border']
     name_font = ImageFont.truetype(_font_path(config), name_size)
-    name_width = measure_rich_text(csv_dict["Card Name"], name_font, "black", color_map, config)
+    name_width = measure_rich_text(card_name, name_font, "black", color_map, config)
     while name_width > config['name_max_width']:
         name_size -= 1
         name_font = ImageFont.truetype(_font_path(config), name_size)
-        name_width = measure_rich_text(csv_dict["Card Name"], name_font, "black", color_map, config)
+        name_width = measure_rich_text(card_name, name_font, "black", color_map, config)
         name_y += 0.5
     if config["center_card_name"]:
         name_x = (image.width - name_width) // 2
     else:
         name_x = config["name_left_border"]
-    draw_rich_text(image, csv_dict["Card Name"], name_font, (name_x, int(name_y)), "black", color_map, config)
+    draw_rich_text(image, card_name, name_font, (name_x, int(name_y)), "black", color_map, config)
 
 
 def write_flavor_text(config, color_map, image, draw, csv_dict, need_displacement):

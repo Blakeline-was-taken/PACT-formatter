@@ -25,13 +25,23 @@ COST_OPTIONS = [
 
 
 def parse_card_tags(value):
-    """Separate free-form tags from background, symbol, and extra-cell tags."""
+    """Separate free-form tags from the card's dedicated tag controls."""
     tags = _split(value)
     background = next((tag[:-3] for tag in tags if tag.lower().endswith("_bg") and tag[:-3]), "").lower()
     symbols = {"left": "", "right": ""}
+    display_name = ""
+    display_name_found = False
     special_tags = set()
     for tag in tags:
         normalized = tag.casefold()
+        key, separator, name = tag.partition("=")
+        if key.strip().casefold() == "display_name":
+            if not display_name_found:
+                if not separator:
+                    raise ValueError("The display_name tag must use the format 'display_name=<text>'.")
+                display_name = name.strip()
+                display_name_found = True
+            special_tags.add(normalized)
         if normalized.endswith("_bg") and normalized[:-3]:
             special_tags.add(normalized)
         for side in symbols:
@@ -50,16 +60,20 @@ def parse_card_tags(value):
     return {
         "background": background,
         "tags": set(tags),
-        "general_tags": [tag for tag in tags if tag.casefold() not in special_tags],
+        "general_tags": [tag for tag in tags if tag.casefold() not in special_tags and tag.partition("=")[0].strip().casefold() != "display_name"],
         "symbols": symbols,
         "extra_cells": extra_cells,
+        "display_name": display_name,
+        "display_name_enabled": display_name_found,
     }
 
 
-def format_card_tags(background, selected_tags, left_symbol, right_symbol, extra_cells):
+def format_card_tags(background, selected_tags, left_symbol, right_symbol, extra_cells, display_name="", display_name_enabled=False):
     """Encode editor tag controls in their established CSV order."""
     tags = [f"{background.strip().lower()}_bg"] if background.strip() else []
     tags.extend(selected_tags)
+    if display_name_enabled:
+        tags.append(f"display_name={display_name.strip()}")
     if left_symbol.strip():
         tags.append(f"{left_symbol.strip()}_left_symbol")
     if right_symbol.strip():

@@ -8,6 +8,21 @@ TRAITS = dict()
 SIGIL_DIR = GENERAL_ASSETS_DIR / "sigils"
 
 
+def parse_display_name_tag(name, tags):
+    """Return a sigil's display name and whether its tag is enabled."""
+    if isinstance(tags, (list, tuple)):
+        raw_tags = tags
+    else:
+        raw_tags = str(tags or "").split(",")
+    for raw_tag in raw_tags:
+        key, separator, value = str(raw_tag).strip().partition("=")
+        if key.strip().casefold() == "display_name":
+            if not separator:
+                raise ValueError("The display_name tag must use the format 'display_name=<text>'.")
+            return value.strip(), True
+    return name, False
+
+
 def get_resized_image(img, height):
     return img.resize((int(img.width * (height / img.height)), height))
 
@@ -41,6 +56,11 @@ class Sigil:
     def __init__(self, name: str, description: str, tags: list, is_trait: bool = False,
                  image: Image = None,short_image: Image = None, base_game_image: Image = None):
         self.name = name
+        if is_trait:
+            self.display_name = name
+            self.display_name_enabled = False
+        else:
+            self.display_name, self.display_name_enabled = parse_display_name_tag(name, tags)
         self.description = description
         self.token_needed = description.count("TOKEN")
         self.tags = tags
@@ -89,7 +109,7 @@ class Sigil:
         font_path = ROOT / "data" / "fonts" / f"{config['font']}.TTF"
         heavyweight_font = ImageFont.truetype(font_path, name_size)
         text_img = Image.new("RGBA", (description_space, name_size), (0, 0, 0, 0))
-        text_width, _, text_img = draw_rich_text(text_img, self.name, heavyweight_font, (0, 0), color, color_map, config)
+        text_width, _, text_img = draw_rich_text(text_img, self.display_name, heavyweight_font, (0, 0), color, color_map, config)
         text_img = text_img.crop((0, 0, round(text_width), name_size))
         final_img_width = max(sigil_img.width, text_img.width)
         final_img_height = sigil_img.height + text_img.height + 5
@@ -115,7 +135,7 @@ class Sigil:
         description_space = config["sigil_space"] - 5 - image_space
         font_path = ROOT / "data" / "fonts" / f"{config['font']}.TTF"
         description = self.get_description()
-        has_dynamic_color = "{color:" in self.name or "{color:" in description
+        has_dynamic_color = "{color:" in self.display_name or "{color:" in description
         if color_map is None:
             color_map = get_color_mapping("default") if has_dynamic_color else {}
         use_cache = config == DEFAULT_CONFIG
@@ -149,16 +169,11 @@ class Sigil:
 
         heavyweight_font = ImageFont.truetype(font_path, name_size)
         text_img = Image.new("RGBA", (description_space, name_size), (0, 0, 0, 0))
-        sigil_name = self.name + (":" if shortened_format else "")
-        size, _, text_img = draw_rich_text(
-            text_img, sigil_name, heavyweight_font, (0, 0), color, color_map, config
-        )
+        sigil_name = self.display_name + (":" if shortened_format and self.display_name else "")
+        size, _, text_img = draw_rich_text(text_img, sigil_name, heavyweight_font, (0, 0), color, color_map, config)
         if shortened_format:
             # Draw sigil using shortened formatting
-            y_offset, text_img = write_description(
-                0, name_size - description_size - 1, size, description_words,
-                color, text_img, description_space, shortened_format, config, color_map
-            )
+            y_offset, text_img = write_description(0, name_size - description_size - 1, size, description_words, color, text_img, description_space, shortened_format, config, color_map)
         else:
             # Draw sigil normally
             new_height = text_img.size[1] + name_size
@@ -168,10 +183,7 @@ class Sigil:
             heavyweight_font = ImageFont.truetype(font_path, description_size)
             size = description_size
 
-            y_offset, text_img = write_description(
-                description_size, name_size, size, description_words,
-                color, text_img, description_space, shortened_format, config, color_map
-            )
+            y_offset, text_img = write_description(description_size, name_size, size, description_words, color, text_img, description_space, shortened_format, config, color_map)
 
         text_height = y_offset + description_size
         final_img_height = max(text_height, sigil_img.height)
@@ -188,17 +200,8 @@ class Sigil:
 
 def add_sigil(csv_dict):
     global SIGILS
-    SIGILS[csv_dict['Name']] = Sigil(
-        csv_dict["Name"], 
-        csv_dict["Description"], 
-        csv_dict["Tags"]
-    )
+    SIGILS[csv_dict['Name']] = Sigil(csv_dict["Name"], csv_dict["Description"], csv_dict["Tags"])
 
 def add_trait(csv_dict):
     global TRAITS
-    TRAITS[csv_dict['Name']] = Sigil(
-        csv_dict["Name"], 
-        csv_dict["Description"], 
-        csv_dict["Tags"], 
-        is_trait=True
-    )
+    TRAITS[csv_dict['Name']] = Sigil(csv_dict["Name"], csv_dict["Description"], csv_dict["Tags"], is_trait=True)
