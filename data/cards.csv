@@ -1,5 +1,6 @@
 Card Name,Art File,Temple,Tier,Cost,Power,Health,Sigils,Token,Traits,Tribes,Flavor Text,Credit,Tags
-Gemification,Gemification.png,Magick,Common,PRISM_-2_3 bones,orange_+1_1,green_+2_1,"GREEN_BLUE_Piercing, Gem Dependent",,,Test Mage,"Oooh, shiny !",NEWS,
+Gemification,Gemification.png,Magick,Demo,prism_-2_3 bones,orange_+1_1,green_+2_1,"green_blue_Piercing, Hint_Gem Dependent",,,Test Mage,"Oooh, shiny !",NEWS,
+Rich Text,RichText.png,Magick,Demo,free,{color:red-dark}1{/color},{color:green-dark}1{/color},,,Color Wheel,{color:light}Test{/color} Card,Icons: {icon:bone} and {sigil:Brittle},{color:dark}Blake{/color}line,display_name={color:rainbow}Rich Text{/color} {sigil:TouchofDeath}
 Bee,Bee.png,Beast,Side Deck,free,1,1,"Airborne, Brittle",,,Insect,Unassuming but determined pests.,Pixel Profligate,
 Krill,Krill.png,Beast,Side Deck,free,0,1,Waterborne,,,Fish,One in a krillion.,Murigen,
 Squirrel,Squirrel.png,Beast,Side Deck,free,0,1,,,,Vermin,"Small, frail, but ever so useful.",Pixel Profligate,
@@ -172,7 +173,7 @@ Spine Wyrm,SpineWyrm.png,Undead,Common,7 bones,3,2,"Sharp Quills, Spine Walker",
 Bone Devil,BoneDevil.png,Undead,Common,9 bones,4,2,"Scavenger, Ensouled",,,Skeleton Demon,An infernal and sadistic creature.,Murigen,
 Carrion Mouth,CarrionMouth.png,Undead,Common,10 bones,2,5,"Bloodsucker, Deathtrap",,,,"Locked away, and for good reason.",Pixel Profligate,
 Rags,Rags.png,Undead,Common,2 energy,0,2,"Unburial, Haunter",,,Spectre,That one seems happier in death.,Murigen,
-Lost Hewer,LostHewer.png,Undead,Common,3 energy,1,1,LATCHER_Bone Digger,,,Spectre,"Despite everything, the labor continues.",Murigen,
+Lost Hewer,LostHewer.png,Undead,Common,3 energy,1,1,LATCH_Bone Digger,,,Spectre,"Despite everything, the labor continues.",Murigen,
 Spook,Spook.png,Undead,Common,3 energy,0,2,"Burrower, Fracture, Bone Digger",,,Spectre,Boo!,Murigen,
 Poltergeist,Poltergeist.png,Undead,Common,4 energy,1,1,"Airborne, Warper",,,Spectre,An incorporeal menace.,"Desaft, Nevernamed",
 Tsukumogami,Tsukumogami.png,Undead,Common,4 energy,0,1,"Bone Digger, Haunter",,,Possessed,A tool that's lived for a century.,Murigen,
@@ -184,7 +185,7 @@ Meatman,Meatman.png,Undead,Common,3 blood,3,3,"Worthy Sacrifice, Haunter",,,Demo
 Mimic,Mimic.png,Undead,Common,2 sapphires,0,2,"Fledgling, Gift Bearer",Carrion Mouth,,Possessed,Contains naught but secrets and fear.,Pixel Profligate,
 The Smoke,TheSmoke.png,Undead,Uncommon,1 bone,0,1,Bone King,,Smoke Trait,Spectre,The last wisp of a life snuffed out.,Pixel Profligate,
 Skelemaster,Skelemaster.png,Undead,Uncommon,5 bones,0,4,Recall the Broken,,Search Brittle,Skeleton,Has an affinity for all things brittle.,Murigen,
-Gone,Gone.png,Undead,Uncommon,4 bones,0,1,LATCHER_Unkillable,,Gone Reminder,Spectre,,Desaft,
+Gone,Gone.png,Undead,Uncommon,4 bones,0,1,LATCH_Unkillable,,Gone Reminder,Spectre,,Desaft,
 Pharaoh's Pets,PharaohsPets.png,Undead,Uncommon,6 bones,0,1,"Many Lives, Bloody Hemanation",,,Zombie,"An inseperable pair, fit for a king.",Pixel Profligate,
 Summoner,Summoner.png,Undead,Uncommon,6 bones,0,4,"Soul Raiser, Memoriam",,,Demon,Its companions won't leave them so soon.,Murigen,
 Nachzehrer,Nachzehrer.png,Undead,Uncommon,7 bones,2,1,"Bloodsucker, Bloodlust, Scrounger",,,Zombie,Consuming whatever carrion it can find.,Pixel Profligate,
@@ -228,7 +229,7 @@ Null Conduit,NullConduit.png,Tech,Side Deck,1 energy,0,2,,,Bloodless,Conduit,"Tr
 Sentry Drone,SentryDrone.png,Tech,Side Deck,1 energy,0,1,Sentry,,Bloodless,Machine,Shoots anything that gets close.,Pixel Profligate,bloodless_bg
 Junk-0,Junk0.png,Tech,Common,1 energy,0,1,Stinky,,,Android,It's odd for rust to smell this bad.,Pixel Profligate,
 Automaton,Automaton.png,Tech,Common,2 energy,1,1,,,,Bot,The most basic in function and form.,Pixel Profligate,
-Boom-o-latcher,Boomolatcher.png,Tech,Common,2 energy,0,1,LATCHER_Detonator,,,Latcher,Loading others with extreme explosives.,Pixel Profligate,
+Boom-o-latcher,Boomolatcher.png,Tech,Common,2 energy,0,1,LATCH_Detonator,,,Latcher,Loading others with extreme explosives.,Pixel Profligate,
 Pop-up Blocker,PopupBlocker.png,Tech,Common,2 energy,0,1,"Burrower, Armored",,,,Your damage request has been denied.,Answearing Machine,
 Draugear,Draugear.png,Tech,Common,2 energy,0,1,Frozen Away,ExeSkeleton,Bloodless,Possessed Machine,"Cold, but not calculating.",Desaft,bloodless_bg
 Energy Bot,EnergyBot.png,Tech,Common,2 energy,0,1,Battery Bearer,,,Bot,Full of energy that it cannot use.,Pixel Profligate,

@@ -1,5 +1,7 @@
 from model import *
 
+COST_DIR = GENERAL_ASSETS_DIR / "costs"
+
 class Cost:
 
     def __init__(self):
@@ -20,20 +22,20 @@ class Cost:
         """
         return False
 
-    def addAsterisk(self, image: Image.Image) -> Image:
+    def addAsterisk(self, image: Image.Image, config=DEFAULT_CONFIG) -> Image:
         if self.asterisk:
-            asterisk_img = Image.open("assets/general_assets/costs/asterisk.png")
-            final_image = Image.new('RGBA', (image.width + asterisk_img.width - 1, max(image.height, asterisk_img.height)))
+            asterisk_img = Image.open(COST_DIR / "asterisk.png")
+            final_image = Image.new('RGBA', (image.width + asterisk_img.width + config['asterisk_right_displacement'], max(image.height, asterisk_img.height)))
             final_image.paste(image, (0, final_image.height - image.height))
-            final_image.paste(asterisk_img, (image.width - 1, 0), mask=asterisk_img)
+            final_image.paste(asterisk_img, (image.width + config['asterisk_right_displacement'], 0), mask=asterisk_img)
             image = final_image
         return image
 
 
 class Asterisk(Cost):
 
-    def getCostImage(self) -> Image:
-        return Image.open("assets/general_assets/costs/asterisk.png").convert("RGBA")
+    def getCostImage(self, config=None) -> Image:
+        return Image.open(COST_DIR / "asterisk.png").convert("RGBA")
 
     @classmethod
     def handle_segment(cls, segment: str, current_costs: list) -> bool:
@@ -63,16 +65,16 @@ class Blood(Cost):
             raise TypeError("Sub operation can only be performed on two resources of the same type")
         return Blood(self.amount - other.amount)
 
-    def getCostImage(self) -> Image:
-        cost_img = Image.open(f"assets/general_assets/costs/blood/blood.png").convert("RGBA")
+    def getCostImage(self, config=DEFAULT_CONFIG) -> Image:
+        cost_img = Image.open(COST_DIR / "blood" / "blood.png").convert("RGBA")
 
-        total_width = cost_img.width * self.amount
+        total_width = cost_img.width * self.amount + config['blood_right_displacement'] * (self.amount - 1)
         final_img = Image.new('RGBA', (total_width, cost_img.height))
         for i in range(self.amount):
-            x_offset = i * cost_img.width
+            x_offset = i * cost_img.width + i * config['blood_right_displacement']
             final_img.paste(cost_img, (x_offset, 0))
 
-        return self.addAsterisk(final_img)
+        return self.addAsterisk(final_img, config)
 
     @classmethod
     def handle_segment(cls, segment: str, current_costs: list) -> bool:
@@ -99,23 +101,20 @@ class Bones(Cost):
             raise TypeError("Sub operation can only be performed on two resources of the same type")
         return Bones(self.amount - other.amount)
 
-    def getCostImage(self) -> Image:
-        bone_img = Image.open("assets/general_assets/costs/bones/bone.png").convert("RGBA")
+    def getCostImage(self, config=DEFAULT_CONFIG) -> Image:
+        bone_img = Image.open(COST_DIR / "bones" / "bone.png").convert("RGBA")
         if self.amount <= 4: # No need for numbers
-            duplicate_bone = bone_img.copy()
-            final_width = bone_img.width + (duplicate_bone.width - 1) * (self.amount - 1)
+            final_width = bone_img.width * self.amount + config['bone_right_displacement'] * (self.amount - 1)
             final_image = Image.new('RGBA', (final_width, bone_img.height))
-            final_image.paste(bone_img, (0, 0))
-
-            for i in range(self.amount - 1):
-                paste_position = (bone_img.width + (duplicate_bone.width - 1) * i - 1, 0)
-                final_image.paste(duplicate_bone, paste_position, duplicate_bone)
+            for i in range(self.amount):
+                x_offset = i * bone_img.width + i * config['bone_right_displacement']
+                final_image.paste(bone_img, (x_offset, 0), bone_img)
 
         else: # Need numbers
             digits = list(str(self.amount))
-            number_img = Image.open(f"assets/general_assets/costs/bones/{digits[0]}.png").convert("RGBA")
+            number_img = Image.open(COST_DIR / "bones" / f"{digits[0]}.png").convert("RGBA")
             for digit in digits[1:]:
-                digit_img = Image.open(f"assets/general_assets/costs/bones/{digit}.png").convert("RGBA")
+                digit_img = Image.open(COST_DIR / "bones" / f"{digit}.png").convert("RGBA")
                 if digit_img.height != 11:
                     new_digit_img = Image.new('RGBA', (digit_img.width, 11))
                     new_digit_img.paste(digit_img, (0, 1), digit_img)
@@ -135,12 +134,12 @@ class Bones(Cost):
                 number_img = new_img
             
             final_image = Image.new('RGBA', (number_img.width + 16, number_img.height))
-            x_img = Image.open(f"assets/general_assets/costs/bones/x.png").convert("RGBA")
+            x_img = Image.open(COST_DIR / "bones" / "x.png").convert("RGBA")
             final_image.paste(number_img, (0, 0), number_img)
             final_image.paste(x_img, (number_img.width, number_img.height-8), x_img)
             final_image.paste(bone_img, (number_img.width+7, number_img.height-8), bone_img)
 
-        return self.addAsterisk(final_image)
+        return self.addAsterisk(final_image, config)
 
     @classmethod
     def handle_segment(cls, segment: str, current_costs: list) -> bool:
@@ -168,7 +167,7 @@ class Energy(Cost):
             raise TypeError("Sub operation can only be performed on two resources of the same type")
         return Energy(self.current_energy - other.current_energy, self.max_energy - other.max_energy)
 
-    def getCostImage(self) -> Image:
+    def getCostImage(self, config=DEFAULT_CONFIG) -> Image:
         first_cell = Image.open("assets/general_assets/costs/energy/cell_first.png").convert("RGBA")
         cell = Image.open("assets/general_assets/costs/energy/cell.png").convert("RGBA")
         energy = Image.open("assets/general_assets/costs/energy/energy.png").convert("RGBA")
@@ -185,7 +184,7 @@ class Energy(Cost):
         else:
             cost_image = energy_img or overcharge_img
 
-        return self.addAsterisk(cost_image)
+        return self.addAsterisk(cost_image, config)
 
 
     def _build_energy_section(self, amount: int, icon: Image, first_cell: Image, cell: Image, x_img: Image, is_overcharge: bool = False) -> Image:
@@ -199,7 +198,7 @@ class Energy(Cost):
             for i, digit in enumerate(digits):
                 cell_x = 4 * (len(digits) - 1 - i)
                 img.paste(first_cell, (cell_x, 0))
-                digit_img = Image.open(f"assets/general_assets/costs/energy/{digit}.png").convert("RGBA")
+                digit_img = Image.open(COST_DIR / "energy" / f"{digit}.png").convert("RGBA")
                 if is_overcharge:
                     digit_img = self._recolor_overcharge(digit_img)
                 img.paste(digit_img, (cell_x + 2, 2), digit_img)
@@ -285,31 +284,26 @@ class Gems(Cost):
         shatter = "_shatter" if "shattered" in gem else ""
         gem = gem.split(" ")[-1].lower()
         color = dict(emeralds="emerald", sapphires="sapphire", rubies="ruby", prisms="prism").get(gem, gem)
-        img = Image.open(f"assets/general_assets/costs/gems/{color.lower()}{shatter}.png").convert("RGBA")
+        img = Image.open(COST_DIR / "gems" / f"{color.lower()}{shatter}.png").convert("RGBA")
         return img
 
-    def getCostImage(self) -> Image:
+    def getCostImage(self, config=DEFAULT_CONFIG) -> Image:
         gem_images = []
         for gem in self.gems:
             image = self.getGemImage(gem)
             for _ in range(int(gem.split(" ")[0])):
                 gem_images.append(image)
 
-        total_width = sum(img.width for img in gem_images) - (len(gem_images) - 1)
+        total_width = sum(img.width for img in gem_images) + config['gem_right_displacement'] * (len(gem_images) - 1)
         max_height = max(img.height for img in gem_images)
 
         cost_image = Image.new("RGBA", (total_width, max_height), (255, 255, 255, 0))
 
         offset = 0
         for img in gem_images:
-            if img.height == 90 and img.height != max_height:
-                paste_position = (offset, 1)
-            else:
-                paste_position = (offset, 0)
-
-            cost_image.paste(img, paste_position, mask=img)
-            offset += img.width - 1
-        return self.addAsterisk(cost_image)
+            cost_image.paste(img, (offset, int(img.height == 90 and img.height != max_height)), img)
+            offset += img.width + config['gem_right_displacement']
+        return self.addAsterisk(cost_image, config)
 
     @classmethod
     def handle_segment(cls, segment: str, current_costs: list) -> bool:

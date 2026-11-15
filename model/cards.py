@@ -1,8 +1,74 @@
 from os import path
-from model import get_color_mapping, apply_temple_colors, load_config, costs, sigils, Image, ImageDraw, ImageFont, logging, FONT, DEFAULT_CONFIG
+from model import (
+    get_color_mapping, apply_temple_colors,
+    load_config,
+    costs, sigils,
+    Image, ImageDraw, ImageFont,
+    logging,
+    ROOT, ASSETS_DIR, GENERAL_ASSETS_DIR, DEFAULT_CONFIG
+)
+from model.text import draw_rich_text, get_inline_icon_size, measure_rich_text, strip_rich_text_tags
 
 
-def get_card_asset(asset_name, default_folder, temple, tier=None, bg_modifier=None):
+STAT_GEM_NAMES = {"green", "blue", "orange", "prism"}
+MOX_TAGS = ("mox_green", "mox_orange", "mox_blue", "mox_prism")
+
+
+def tag_values(value):
+    """Return normalized, comma-separated tags for exact tag matching."""
+    if not value or str(value).strip().casefold() == "none":
+        return set()
+    return {tag.strip().casefold() for tag in str(value).split(",") if tag.strip()}
+
+
+def _card_display_name(csv_dict):
+    """Return a card's display_name tag value, or its configured name."""
+    for raw_tag in str(csv_dict.get("Tags", "")).split(","):
+        key, separator, value = raw_tag.strip().partition("=")
+        if key.strip().casefold() == "display_name":
+            if not separator:
+                raise ValueError("The display_name tag must use the format 'display_name=<text>'.")
+            return value.strip()
+    return csv_dict["Card Name"]
+
+
+def _font_path(config):
+    return ROOT / "data" / "fonts" / f"{config.get('font', DEFAULT_CONFIG['font'])}.TTF"
+
+
+def parse_stat_gemification(value):
+    """Split a gemified stat into its gems, gemification text, and displayed value."""
+    parts = []
+    start = 0
+    in_markup = False
+    for index, character in enumerate(value):
+        if character == "{":
+            in_markup = True
+        elif character == "}":
+            in_markup = False
+        elif character == "_" and not in_markup:
+            parts.append(value[start:index])
+            start = index + 1
+    parts.append(value[start:])
+
+    gems = []
+    for part in parts:
+        if part.lower() not in STAT_GEM_NAMES:
+            break
+        gems.append(part.lower())
+    if not gems or len(parts) <= len(gems):
+        return None
+
+    remaining = parts[len(gems):]
+    stat_value = remaining[-1]
+    effect = "_".join(remaining[:-1])
+    return gems, effect, stat_value
+
+
+def get_card_asset(asset_name, default_folder, temple, tier=None, bg_modifier=None, fallback_tier=DEFAULT_CONFIG["default_tier"], color_tier=None):
+    if color_tier is None:
+        color_tier = tier
+
     prefixes = []
     if tier and bg_modifier:
         prefixes.append(f"{tier}_{bg_modifier}_")
@@ -12,45 +78,61 @@ def get_card_asset(asset_name, default_folder, temple, tier=None, bg_modifier=No
         prefixes.append(f"{bg_modifier}_")
     prefixes.append("")
 
-    directories = [f"assets/{temple.lower()}", f"assets/general_assets/{default_folder}"]
+    directories = [ASSETS_DIR / temple.lower(), GENERAL_ASSETS_DIR / default_folder]
     for prefix in prefixes:
         for directory in directories:
             try:
-                return apply_temple_colors(Image.open(f"{directory}/{prefix}{asset_name}.png"), temple, tier, bg_modifier)
+                image = Image.open(directory / f"{prefix}{asset_name}.png")
             except (FileNotFoundError, PermissionError):
                 continue
+
+            try:
+                return apply_temple_colors(image, temple, color_tier, bg_modifier)
+            except (FileNotFoundError, PermissionError):
+                if fallback_tier and fallback_tier != color_tier:
+                    try:
+                        return apply_temple_colors(image, temple, fallback_tier, bg_modifier)
+                    except (FileNotFoundError, PermissionError):
+                        continue
+                continue
     
-    return get_card_asset(asset_name, default_folder, temple, DEFAULT_CONFIG["default_tier"], bg_modifier)
+    return get_card_asset(asset_name, default_folder, temple, fallback_tier, bg_modifier, fallback_tier, color_tier)
 
-def get_cardback(temple, tier, bg_modifier=None):
-    return get_card_asset("bg", "cardbacks", temple, tier, bg_modifier)
+def get_cardback(temple, tier, bg_modifier=None, fallback_tier=None):
+    return get_card_asset("bg", "cardbacks", temple, tier, bg_modifier, fallback_tier)
 
-def get_empty_cardback_bottom(temple, tier, bg_modifier=None):
-    return get_card_asset("bg_emptybottom", "cardbacks", temple, tier, bg_modifier)
+def get_empty_cardback_bottom(temple, tier, bg_modifier=None, fallback_tier=None):
+    return get_card_asset("bg_emptybottom", "cardbacks", temple, tier, bg_modifier, fallback_tier)
 
-def get_vanilla_gemification(temple, tier, bg_modifier=None):
-    return get_card_asset("vanilla_gemify", "extras/gemification", temple, tier, bg_modifier)
+def get_symbol(temple, tier, bg_modifier=None, right=False, fallback_tier=None):
+    if right:
+        return get_card_asset("right_symbol", "cardbacks", temple, tier, bg_modifier, fallback_tier)
+    else:
+        return get_card_asset("left_symbol", "cardbacks", temple, tier, bg_modifier, fallback_tier)
 
-def get_conduit_indicator(temple, tier, bg_modifier=None):
-    return get_card_asset("conduit", "extras/indicators", temple, tier, bg_modifier)
+def get_vanilla_gemification(temple, tier, bg_modifier=None, fallback_tier=None):
+    return get_card_asset("vanilla_gemify", "extras/gemification", temple, tier, bg_modifier, fallback_tier)
 
-def get_mox_indicator(temple, tier, bg_modifier=None):
-    return get_card_asset("mox", "extras/indicators", temple, tier, bg_modifier)
+def get_conduit_indicator(temple, tier, bg_modifier=None, fallback_tier=None):
+    return get_card_asset("conduit", "extras/indicators", temple, tier, bg_modifier, fallback_tier)
 
-def get_conduit_mox_indicator(temple, tier, bg_modifier=None):
-    return get_card_asset("conduit_mox", "extras/indicators", temple, tier, bg_modifier)
+def get_mox_indicator(temple, tier, bg_modifier=None, fallback_tier=None):
+    return get_card_asset("mox", "extras/indicators", temple, tier, bg_modifier, fallback_tier)
 
-def get_traitline_image(temple, tier, bg_modifier):
-    traitline = get_card_asset("traitline", "cardbacks", temple, tier, bg_modifier)
+def get_conduit_mox_indicator(temple, tier, bg_modifier=None, fallback_tier=None):
+    return get_card_asset("conduit_mox", "extras/indicators", temple, tier, bg_modifier, fallback_tier)
+
+def get_traitline_image(temple, tier, bg_modifier, fallback_tier=None):
+    traitline = get_card_asset("traitline", "cardbacks", temple, tier, bg_modifier, fallback_tier)
     return traitline.resize((traitline.width * 10, traitline.height * 10), Image.NEAREST)
 
 
 def get_card_art(art_filename, temple, bg_modifier):
     try:
-        art = Image.open(f"assets/general_assets/card_art/{art_filename}")
+        art = Image.open(GENERAL_ASSETS_DIR / "card_art " / art_filename)
         return apply_temple_colors(art, temple, bg_modifier)
     except (FileNotFoundError, PermissionError):
-        return Image.open(f"assets/general_assets/card_art/_placeholder_.png")
+        return Image.open(GENERAL_ASSETS_DIR / "card_art " / "_placeholder_.png")
 
 
 def get_sigil_data(config, csv_dict):
@@ -83,14 +165,14 @@ def get_sigil_data(config, csv_dict):
                 for _ in range(target_obj.token_needed):
                     target_obj.addToken(str_tokens[token_id % len(str_tokens)])
                     token_id += 1
-            for tag in target_obj.tags.split(','):
-                if "power_sigil" in tag:
-                    power_sigil = target_obj.sigilImage()
-                elif "health_sigil" in tag:
-                    health_sigil = target_obj.sigilImage()
-                elif "conduit_sigil" in tag:
+            for tag in tag_values(target_obj.tags):
+                if tag == "power_sigil":
+                    power_sigil = target_obj.sigilImage(config=config)
+                elif tag == "health_sigil":
+                    health_sigil = target_obj.sigilImage(config=config)
+                elif tag == "conduit_sigil":
                     conduit_sigil = target_obj.name.replace(" ", "")
-                elif "mox_" in tag:
+                elif tag in MOX_TAGS:
                     mox_provided.append(tag)
 
     sigil_list = []
@@ -108,23 +190,24 @@ def get_sigil_data(config, csv_dict):
 
 def print_indicators(config, image, csv_dict, bg_modifier=None, mox_provided=[]):
     need_displacement = False
-    if "conduit_indicator" in csv_dict["Tags"]:
-        conduit_image = get_conduit_indicator(csv_dict["Temple"], csv_dict["Tier"], bg_modifier)
+    card_tags = tag_values(csv_dict.get("Tags", ""))
+    if "conduit_indicator" in card_tags:
+        conduit_image = get_conduit_indicator(csv_dict["Temple"], csv_dict["Tier"], bg_modifier, config["default_tier"])
         image.paste(conduit_image, (0, 0), conduit_image)
         need_displacement = True
-    if "mox_indicator" in csv_dict["Tags"]:
+    if "mox_indicator" in card_tags:
         # Here, if need_displacement is true, it means we also already have a conduit indicator in place.
         conduit = "conduit_" if need_displacement else ""
         if conduit:
-            mox_image = get_conduit_mox_indicator(csv_dict["Temple"], csv_dict["Tier"], bg_modifier)
+            mox_image = get_conduit_mox_indicator(csv_dict["Temple"], csv_dict["Tier"], bg_modifier, config["default_tier"])
         else:
-            mox_image = get_mox_indicator(csv_dict["Temple"], csv_dict["Tier"], bg_modifier)
+            mox_image = get_mox_indicator(csv_dict["Temple"], csv_dict["Tier"], bg_modifier, config["default_tier"])
         image.paste(mox_image, (0, 0), mox_image)
 
-        possible_moxes = ["mox_green", "mox_orange", "mox_blue", "mox_prism"]
+        possible_moxes = MOX_TAGS
         for mox in possible_moxes:
-            if mox in csv_dict["Tags"] or mox in mox_provided:
-                mox_img = Image.open(f"assets/general_assets/extras/indicators/{conduit}{mox}.png")
+            if mox in card_tags or mox in mox_provided:
+                mox_img = Image.open(GENERAL_ASSETS_DIR / "extras" / "indicators" / f"{conduit}{mox}.png")
                 image.paste(mox_img, (0, 0), mox_img)
                 
         need_displacement = True
@@ -133,18 +216,19 @@ def print_indicators(config, image, csv_dict, bg_modifier=None, mox_provided=[])
 
 def print_stat_gemification_indicators(config, image, csv_dict, bg_modifier=None):
     for stat in ["Health", "Power", "Cost"]:
-        if "_" not in csv_dict[stat]:
+        gemification = parse_stat_gemification(csv_dict[stat])
+        if not gemification:
             continue
 
-        gemified_asset = get_card_asset(stat.lower(), "extras/gemification", csv_dict["Temple"], csv_dict["Tier"], bg_modifier)
+        gemified_asset = get_card_asset(stat.lower(), "extras/gemification", csv_dict["Temple"], csv_dict["Tier"], bg_modifier, config["default_tier"])
         image.paste(gemified_asset, (0, 0), gemified_asset)
         
-        gems_list = csv_dict[stat].lower().split("_")[:-2]
+        gems_list, _, _ = gemification
         if "prism" in gems_list:
             gem_file = "prism"
         else:
             gem_file = "_".join([g for g in ["green", "orange", "blue"] if g in gems_list])
-        gem_image = get_card_asset(gem_file, "extras/gemification", csv_dict["Temple"], csv_dict["Tier"], bg_modifier)
+        gem_image = get_card_asset(gem_file, "extras/gemification", csv_dict["Temple"], csv_dict["Tier"], bg_modifier, config["default_tier"])
         
         gem_x = config[f'gemification_{stat.lower()}_horizontal_center'] - (gem_image.width // 2)
         if stat == "Health":
@@ -163,11 +247,11 @@ def print_card_cost(config, image, csv_dict):
     cost_x = config['cost_right_border']
     if "_" in cost:
         cost = cost.lower().split("_").pop()
-        cost_x -= config["cost_right_border_gemification_displacement"]
+        cost_x += config["cost_right_border_gemification_displacement"]
         
     cost_images = []
     for c in costs.get_cost(cost):
-        cost_images.append(apply_temple_colors(c.getCostImage(), csv_dict['Temple'], csv_dict['Tier']))
+        cost_images.append(apply_temple_colors(c.getCostImage(config), csv_dict['Temple'], csv_dict['Tier']))
 
     cost_y = config['cost_bottom_border']
     height_to_skip = 0
@@ -183,14 +267,20 @@ def print_card_cost(config, image, csv_dict):
 
 def print_extra_cell_indicators(config, image, csv_dict, bg_modifier=None):
     for tag in csv_dict["Tags"].split(","):
-        if "extra_cell" in tag.strip():
-            cells = int(tag.strip().split("_")[0])
-            cell_y = config['extra_cells_top_border']
-            cell_image = get_card_asset("extra_cell", "extras/indicators", csv_dict["Temple"], csv_dict["Tier"], bg_modifier)
-            for _ in range(cells):
-                image.paste(cell_image, (config['extra_cells_left_border'], cell_y), cell_image)
-                cell_y += cell_image.height - 1
-            return
+        normalized = tag.strip().casefold()
+        suffix = "_extra_cell"
+        if not normalized.endswith(suffix):
+            continue
+        count = normalized[:-len(suffix)]
+        if not count.isdigit():
+            continue
+
+        cells = int(count)
+        cell_y = config['extra_cells_top_border']
+        cell_image = get_card_asset("extra_cell", "extras/indicators", csv_dict["Temple"], csv_dict["Tier"], bg_modifier, config["default_tier"])
+        for _ in range(cells):
+            image.paste(cell_image, (config['extra_cells_left_border'], cell_y), cell_image)
+            cell_y += cell_image.height - 1
 
 
 def print_tribes(config, image, csv_dict, bg_modifier=None):
@@ -198,19 +288,48 @@ def print_tribes(config, image, csv_dict, bg_modifier=None):
         pos_y = config['tribes_top_border']
         for tribe in csv_dict["Tribes"].split(" "):
             if tribe:
-                icon_path = f"assets/general_assets/tribes/{tribe.lower()}.png"
+                icon_path = GENERAL_ASSETS_DIR / "tribes" / f"{tribe.lower()}.png"
                 if path.exists(icon_path):
                     tribe_icon = apply_temple_colors(Image.open(icon_path), csv_dict["Temple"], csv_dict["Tier"], bg_modifier)
                 else:
-                    tribe_icon = apply_temple_colors(Image.open("assets/general_assets/tribes/_placeholder_.png"), csv_dict["Temple"], csv_dict["Tier"], bg_modifier)
+                    tribe_icon = apply_temple_colors(Image.open(GENERAL_ASSETS_DIR / "tribes" / "_placeholder_.png"), csv_dict["Temple"], csv_dict["Tier"], bg_modifier)
                 tribe_icon = tribe_icon.resize((tribe_icon.width * 5, tribe_icon.height * 5), Image.NEAREST)
                 image.paste(tribe_icon, (config['tribes_left_border'], pos_y), tribe_icon)
-                pos_y += tribe_icon.height - 5
+                pos_y += tribe_icon.height + 5 * config['tribes_vertical_displacement']
+
+
+def print_symbols(config, image, csv_dict, bg_modifier=None):
+    symbols = [False, False] # Left symbol, Right symbol
+
+    for raw_tag in csv_dict["Tags"].split(","):
+        tag = raw_tag.strip()
+        normalized = tag.casefold()
+        if normalized.endswith("_left_symbol"):
+            right_symbol = False
+            tag_sigil = tag[:-len("_left_symbol")].strip()
+        elif normalized.endswith("_right_symbol"):
+            right_symbol = True
+            tag_sigil = tag[:-len("_right_symbol")].strip()
+        else:
+            continue
+        if not tag_sigil or symbols[right_symbol] or tag_sigil not in sigils.SIGILS:
+            continue
+
+        tag_sigil = sigils.SIGILS[tag_sigil].copy()
+        symbols[right_symbol] = True
+        symbol = get_symbol(csv_dict['Temple'], csv_dict['Tier'], bg_modifier, right_symbol, config["default_tier"]).resize(image.size, Image.NEAREST)
+        image.paste(symbol, (0, 0), symbol)
+        coord = config[f'{"right" if right_symbol else "left"}_symbol']
+        sigil_image = tag_sigil.sigilImage(config=config)
+        coord = (coord[0] - sigil_image.width // 2, coord[1] - sigil_image.height // 2)
+        sigil_img = tag_sigil.sigilImage(color=(0, 0, 0) if config['colorless_symbols'] else 'black', config=config)
+        image = paste_sigil(image, sigil_img, coord)
+    return image
 
 
 def paste_sigil(image, sigil_img, box):
     sigil_img_trans = Image.new("RGBA", image.size)
-    sigil_img_trans.paste(sigil_img, box, mask=sigil_img)
+    sigil_img_trans.paste(sigil_img, box)
     new_img = Image.alpha_composite(image, sigil_img_trans)
     return new_img
 
@@ -219,7 +338,7 @@ def paste_empty_cardback_bottom(config, image, temple, tier, bg_modifier=None):
     if not config["allow_card_bottom_removal"]:
         # If bottom removal is not allowed, return None to indicate failure
         return None
-    bottom_image = get_empty_cardback_bottom(temple, tier, bg_modifier)
+    bottom_image = get_empty_cardback_bottom(temple, tier, bg_modifier, config["default_tier"])
     bottom_image = bottom_image.resize((bottom_image.width * 10, bottom_image.height * 10), Image.NEAREST)
     image.paste(bottom_image, (0, image.height - bottom_image.height), bottom_image)
     return image
@@ -233,13 +352,13 @@ def print_card_sigils_and_traits(config, color_map, bg_modifier, image, sigil_y,
     sigil_x = config['sigil_left_border']
     for sigil in sigil_list:
         if isinstance(sigil, SigilConditional):
-            sigil_y -= sigil.top_displacement
+            sigil_y += sigil.top_displacement
             sigil_y -= sigil_y % 10
             sigil_img = sigil.getImage(config, color_map, csv_dict['Temple'], csv_dict['Tier'], bg_modifier, use_shortened_format)
             overlay = paste_sigil(overlay, sigil_img, (0, sigil_y))
-            sigil_y -= sigil.bottom_displacement
+            sigil_y += sigil.bottom_displacement
         else:
-            sigil_img = sigil.getImage(shortened_format=use_shortened_format)
+            sigil_img = sigil.getImage(shortened_format=use_shortened_format, config=config, color_map=color_map)
             if sigil_y + sigil_img.height > image.height:
                 # If the sigil would go off the bottom of the card, return None to indicate failure
                 return None
@@ -255,11 +374,11 @@ def print_card_sigils_and_traits(config, color_map, bg_modifier, image, sigil_y,
     # Print the traits
     # -----------------------
     if len(trait_list) > 0:
-        traitline_img = get_traitline_image(csv_dict['Temple'], csv_dict['Tier'], bg_modifier)
+        traitline_img = get_traitline_image(csv_dict['Temple'], csv_dict['Tier'], bg_modifier, config["default_tier"])
         trait_images = []
         trait_height = traitline_img.height + config['traitline_vertical_spacing']
         for trait in trait_list:
-            trait_img = trait.getImage(color=color_map["trait_color"])
+            trait_img = trait.getImage(color=color_map["trait_color"], config=config, color_map=color_map)
             trait_height += trait_img.height + config['trait_vertical_spacing']
             trait_images.append(trait_img)
 
@@ -280,10 +399,10 @@ def print_card_sigils_and_traits(config, color_map, bg_modifier, image, sigil_y,
             else:
                 trait_y = sigil_y - (sigil_y % 10) + 10
 
-        overlay.paste(traitline_img, ((overlay.width - traitline_img.width) // 2, trait_y), traitline_img)
+        overlay.paste(traitline_img, ((overlay.width - traitline_img.width) // 2, trait_y))
         trait_y += traitline_img.height + config['traitline_vertical_spacing']
         for trait_img in trait_images:
-            overlay.paste(trait_img, (sigil_x, trait_y), trait_img)
+            overlay.paste(trait_img, (sigil_x, trait_y))
             trait_y += trait_img.height + config['trait_vertical_spacing']
 
     return Image.alpha_composite(image, overlay)
@@ -294,11 +413,11 @@ def print_base_game_card(config, color_map, bg_modifier, image, sigil_y, csv_dic
     
     trait_height = 0
     if len(trait_list) > 0:
-        traitline_img = get_traitline_image(csv_dict['Temple'], csv_dict['Tier'], bg_modifier)
+        traitline_img = get_traitline_image(csv_dict['Temple'], csv_dict['Tier'], bg_modifier, config["default_tier"])
         trait_images = []
         trait_height = traitline_img.height + config['traitline_vertical_spacing']
         for trait in trait_list:
-            trait_img = trait.getImage(color=color_map["trait_color"])
+            trait_img = trait.getImage(color=color_map["trait_color"], config=config, color_map=color_map)
             trait_height += trait_img.height + config['trait_vertical_spacing']
             trait_images.append(trait_img)
 
@@ -308,7 +427,7 @@ def print_base_game_card(config, color_map, bg_modifier, image, sigil_y, csv_dic
     sigil_heights = [0]
     current_row_width = 0
     for sigil in sigil_list:
-        sigil_img = sigil.getImage(base_game=True)
+        sigil_img = sigil.getImage(base_game=True, config=config, color_map=color_map)
         if current_row_width + sigil_img.width > size:
             sigil_rows.append([])
             sigil_heights.append(0)
@@ -341,50 +460,56 @@ def print_base_game_card(config, color_map, bg_modifier, image, sigil_y, csv_dic
         space_between = free_space / (num_sigils + 1) if num_sigils > 0 else 0
         row_x = sigil_left + space_between
         for sigil_img in row:
-            overlay.paste(sigil_img, (int(row_x), sigil_y), sigil_img)
+            overlay.paste(sigil_img, (int(row_x), sigil_y))
             row_x += sigil_img.width + space_between
         sigil_y += sigil_heights[row_index] + config['sigil_vertical_spacing']
 
     if len(trait_list) > 0:
-        overlay.paste(traitline_img, ((overlay.width - traitline_img.width) // 2, trait_y), traitline_img)
+        overlay.paste(traitline_img, ((overlay.width - traitline_img.width) // 2, trait_y))
         trait_y += traitline_img.height + config['traitline_vertical_spacing']
         for trait_img in trait_images:
-            overlay.paste(trait_img, (sigil_left, trait_y), trait_img)
+            overlay.paste(trait_img, (sigil_left, trait_y))
             trait_y += trait_img.height + config['trait_vertical_spacing']
 
     return Image.alpha_composite(image, overlay)
 
 
-def write_name(config, image, draw, csv_dict):
+def write_name(config, color_map, image, draw, csv_dict):
+    card_name = _card_display_name(csv_dict)
     name_size = config['name_font_size']
     name_y = config['name_top_border']
-    name_font = ImageFont.truetype(FONT, name_size)
-    while draw.textlength(csv_dict["Card Name"], font=name_font) > config['name_max_width']:
+    name_font = ImageFont.truetype(_font_path(config), name_size)
+    name_width = measure_rich_text(card_name, name_font, "black", color_map, config)
+    while name_width > config['name_max_width']:
         name_size -= 1
-        name_font = ImageFont.truetype(FONT, name_size)
+        name_font = ImageFont.truetype(_font_path(config), name_size)
+        name_width = measure_rich_text(card_name, name_font, "black", color_map, config)
         name_y += 0.5
     if config["center_card_name"]:
-        name_x = (image.width - draw.textlength(csv_dict["Card Name"], font=name_font)) // 2
+        name_x = (image.width - name_width) // 2
     else:
         name_x = config["name_left_border"]
-    draw.text((name_x, int(name_y)), csv_dict["Card Name"], fill="black", font=name_font)
+    draw_rich_text(image, card_name, name_font, (name_x, int(name_y)), "black", color_map, config)
 
 
 def write_flavor_text(config, color_map, image, draw, csv_dict, need_displacement):
-    flavor_text = csv_dict["Flavor Text"].replace("\r", "").replace("\n", " ")
-    flavor_font = ImageFont.truetype(FONT, config['flavor_text_font_size'])
+    flavor_text = csv_dict["Flavor Text"]
+    flavor_font = ImageFont.truetype(_font_path(config), config['flavor_text_font_size'])
+    flavor_text_y = config['flavor_text_top_border'] + (config['indicator_displacement'] if need_displacement else 0)
     if flavor_text != "":
-        while draw.textlength(flavor_text, font=flavor_font) > config['flavor_text_max_width']:
-            limit = flavor_text.rfind(" ") if " " in flavor_text else -6
-            flavor_text = flavor_text[:limit] + "..."
-            flavor_text += "''" if "''" in flavor_text else ""
-        flavor_text_x = config['flavor_text_left_border'] + (config['flavor_text_max_width'] - draw.textlength(flavor_text, font=flavor_font)) // 2
-        flavor_text_y = config['flavor_text_top_border'] + (config['indicator_displacement'] if need_displacement else 0)
-        draw.text((flavor_text_x, flavor_text_y), flavor_text, fill=color_map["flavor_text_color"], font=flavor_font)
+        text_width = config['flavor_text_right_border'] - config['flavor_text_left_border']
+        _, text_height, _ = draw_rich_text(
+            image, flavor_text, flavor_font, (config['flavor_text_left_border'], flavor_text_y), color_map["flavor_text_color"],
+            color_map, config, max_width=text_width, align="center"
+        )
+        flavor_text_y += text_height
+    else:
+        flavor_text_y += config['flavor_text_font_size']  # Add a line height even if there's no flavor text to maintain spacing
+    return flavor_text_y + config['sigil_top_displacement']
 
 
 def write_metadata(config, color_map, image, draw, csv_dict):
-    metadata_font = ImageFont.truetype(FONT, config['metadata_font_size'])
+    metadata_font = ImageFont.truetype(_font_path(config), config['metadata_font_size'])
     description = f"{csv_dict['Tier']} {csv_dict['Temple']}"
     tribes = csv_dict['Tribes'].split(' ') if csv_dict['Tribes'] not in ['None', ''] else []
     if len(tribes) > 0:
@@ -393,51 +518,86 @@ def write_metadata(config, color_map, image, draw, csv_dict):
             description += tribe + " "
         description = description[:-1]
     desc_y = config['metadata_top_border']
-    desc_x = (image.width - draw.textlength(description, font=metadata_font)) // 2
-    draw.text((desc_x, desc_y), description, fill=color_map["metadata_color"], font=metadata_font)
+    draw_rich_text(
+        image, description, metadata_font, (0, desc_y), color_map["metadata_color"],
+        color_map, config, max_width=image.width, align="center"
+    )
 
 
 def write_art_credit(config, color_map, image, draw, csv_dict):
-    art_credit_font = ImageFont.truetype(FONT, config['art_credit_font_size'])
+    art_credit_font = ImageFont.truetype(_font_path(config), config['art_credit_font_size'])
     artist_text = f"Art by {csv_dict['Credit']}"
     desc_y = config['art_credit_top_border']
-    desc_x = (image.width - draw.textlength(artist_text, font=art_credit_font)) // 2
-    draw.text((desc_x, desc_y), artist_text, color_map["art_credit_color"], font=art_credit_font)
+    draw_rich_text(
+        image, artist_text, art_credit_font, (0, desc_y), color_map["art_credit_color"],
+        color_map, config, max_width=image.width, align="center"
+    )
 
 
-def write_stats(config, image, csv_dict, power_sigil, health_sigil, bg_modifier):
-    stats_font = ImageFont.truetype(FONT, config['stats_font_size'])
+def _stat_text_position(text, font, center, color_map, config):
+    """Return a text origin that centers a stat's rendered bounds on a point."""
+    width = measure_rich_text(text, font, "black", color_map, config)
+    visible_text = strip_rich_text_tags(text).replace(r"\n", "\n")
+    lines = visible_text.split("\n") or ["0"]
+    line_height = max(font.size, get_inline_icon_size(text, font))
+    line_bounds = [font.getbbox(line or "0") for line in lines]
+    top = min(bounds[1] + index * line_height for index, bounds in enumerate(line_bounds))
+    bottom = max(bounds[3] + index * line_height for index, bounds in enumerate(line_bounds))
+    return center[0] - width // 2, center[1] - (top + bottom) // 2
+
+
+def _centered_image_position(image, center):
+    return center[0] - image.width // 2, center[1] - image.height // 2
+
+
+def write_stats(config, color_map, image, csv_dict, power_sigil, health_sigil, bg_modifier):
+    stats_font = ImageFont.truetype(_font_path(config), config['stats_font_size'])
     
     if power_sigil and config['show_power_sigil']:
-        power_center = config['power_sigil_center']
-        image = paste_sigil(image, power_sigil, (power_center[0] - power_sigil.width // 2, power_center[1] - power_sigil.height // 2))
+        image = paste_sigil(image, power_sigil, _centered_image_position(power_sigil, config["power_center"]))
     else:
         power = csv_dict["Power"]
-        if "_" in power:
-            power = power.lower().split("_").pop()
-        draw = ImageDraw.Draw(image)
-        draw.text(config['power_coord'], power, fill="black", font=stats_font)
+        gemification = parse_stat_gemification(power)
+        if gemification:
+            power = gemification[2]
+        draw_rich_text(
+            image,
+            power,
+            stats_font,
+            _stat_text_position(power, stats_font, config["power_center"], color_map, config),
+            "black",
+            color_map,
+            config,
+        )
 
     if health_sigil and config['show_health_sigil']:
-        health_center = config['health_sigil_center']
-        image = paste_sigil(image, health_sigil, (health_center[0] - health_sigil.width // 2, health_center[1] - health_sigil.height // 2))
+        image = paste_sigil(image, health_sigil, _centered_image_position(health_sigil, config["health_center"]))
     else:
         health = csv_dict["Health"]
-        if "_" in health:
-            health = health.lower().split("_").pop()
-        draw = ImageDraw.Draw(image)
-        draw.text(config['health_coord'], health, fill="black", font=stats_font)
+        gemification = parse_stat_gemification(health)
+        if gemification:
+            health = gemification[2]
+        draw_rich_text(
+            image,
+            health,
+            stats_font,
+            _stat_text_position(health, stats_font, config["health_center"], color_map, config),
+            "black",
+            color_map,
+            config,
+        )
 
     return image
 
 
-def write_stat_gemification_text(config, image, draw, csv_dict):
-    gemification_font = ImageFont.truetype(FONT, config['gemification_font_size'])
+def write_stat_gemification_text(config, color_map, image, draw, csv_dict):
+    gemification_font = ImageFont.truetype(_font_path(config), config['gemification_font_size'])
     for stat in ["Health", "Power", "Cost"]:
-        if "_" in csv_dict[stat]:
-            text = csv_dict[stat].split("_")[-2]
-            text_x = config[f'gemification_{stat.lower()}_text_horizontal_center'] - (draw.textlength(text, font=gemification_font) // 2)
-            draw.text((text_x, config[f'gemification_{stat.lower()}_text_top_border']), text, fill="black", font=gemification_font)
+        gemification = parse_stat_gemification(csv_dict[stat])
+        if gemification and gemification[1]:
+            text = gemification[1]
+            text_x = config[f'gemification_{stat.lower()}_text_horizontal_center'] - (measure_rich_text(text, gemification_font, "black", color_map, config) // 2)
+            draw_rich_text(image, text, gemification_font, (text_x, config[f'gemification_{stat.lower()}_text_top_border']), "black", color_map, config)
 
 
 class SigilConditional():
@@ -473,13 +633,13 @@ class CellConditional(SigilConditional):
         )
 
     def getImage(self, config, color_map, temple, tier, bg_modifier, use_shortened_format=False):
-        sigil_img = self.sigil.getImage(shortened_format=use_shortened_format)
+        sigil_img = self.sigil.getImage(shortened_format=use_shortened_format, config=config, color_map=color_map)
         if sigil_img.height < config["cell_sigil_small_max_height"]:
-            patch_image = get_card_asset("cell", "extras/conditionals", temple, tier, bg_modifier)
+            patch_image = get_card_asset("cell", "extras/conditionals", temple, tier, bg_modifier, config["default_tier"])
         elif sigil_img.height < config["cell_sigil_medium_max_height"]:
-            patch_image = get_card_asset("cell3", "extras/conditionals", temple, tier, bg_modifier)
+            patch_image = get_card_asset("cell3", "extras/conditionals", temple, tier, bg_modifier, config["default_tier"])
         else:
-            patch_image = get_card_asset("cell4", "extras/conditionals", temple, tier, bg_modifier)
+            patch_image = get_card_asset("cell4", "extras/conditionals", temple, tier, bg_modifier, config["default_tier"])
         return paste_sigil(patch_image, sigil_img, (config["sigil_left_border"], (patch_image.height - sigil_img.height) // 2 + 3))
 
     @classmethod
@@ -503,14 +663,14 @@ class LatcherConditional(SigilConditional):
         )
 
     def getImage(self, config, color_map, temple, tier, bg_modifier, use_shortened_format=False):
-        sigil_img = self.sigil.getImage(shortened_format=use_shortened_format)
+        sigil_img = self.sigil.getImage(shortened_format=use_shortened_format, config=config, color_map=color_map)
         if sigil_img.height < config["latch_sigil_small_max_height"]:
-            patch_image = get_card_asset("latch", "extras/conditionals", temple, tier, bg_modifier)
+            patch_image = get_card_asset("latch", "extras/conditionals", temple, tier, bg_modifier, config["default_tier"])
         elif sigil_img.height < config["latch_sigil_medium_max_height"]:
-            patch_image = get_card_asset("latch3", "extras/conditionals", temple, tier, bg_modifier)
+            patch_image = get_card_asset("latch3", "extras/conditionals", temple, tier, bg_modifier, config["default_tier"])
         else:
-            patch_image = get_card_asset("latch4", "extras/conditionals", temple, tier, bg_modifier)
-        latch_head = get_card_asset("latch_head", "extras/conditionals", temple, tier, bg_modifier)
+            patch_image = get_card_asset("latch4", "extras/conditionals", temple, tier, bg_modifier, config["default_tier"])
+        latch_head = get_card_asset("latch_head", "extras/conditionals", temple, tier, bg_modifier, config["default_tier"])
         patch_image.paste(latch_head, (config["left_latch_head_border"] - latch_head.width, (patch_image.height - latch_head.height) // 2), latch_head)
         latch_head = latch_head.transpose(Image.FLIP_LEFT_RIGHT)
         patch_image.paste(latch_head, (config["right_latch_head_border"], (patch_image.height - latch_head.height) // 2), latch_head)
@@ -527,6 +687,26 @@ class LatcherConditional(SigilConditional):
         return None
 
 
+class HintConditional(SigilConditional):
+
+    def __init__(self, config, sigil):
+        super().__init__(sigil)
+    
+    def getImage(self, config, color_map, temple, tier, bg_modifier, use_shortened_format=False):
+        sigil_img = self.sigil.getImage(color=color_map["hint_color"], shortened_format=use_shortened_format, config=config, color_map=color_map)
+        patch_image = Image.new("RGBA", (sigil_img.width + config["sigil_left_border"], sigil_img.height), (0, 0, 0, 0))
+        return paste_sigil(patch_image, sigil_img, (config["sigil_left_border"], 0))
+
+    @classmethod
+    def handle_sigil_entry(cls, config, sigil_entry: str):
+        if "_" not in sigil_entry:
+            return None
+        sigil = sigil_entry.split("_")
+        if sigil[0].lower() == "hint":
+            if sigil[1] in sigils.SIGILS:
+                return HintConditional(config, sigils.SIGILS[sigil[1]].copy())
+        return None
+
 class GemifyConditional(SigilConditional):
 
     def __init__(self, config, sigil, gems=[]):
@@ -538,13 +718,13 @@ class GemifyConditional(SigilConditional):
         )
 
     def getImage(self, config, color_map, temple, tier, bg_modifier, use_shortened_format=False):
-        sigil_img = self.sigil.getImage(shortened_format=use_shortened_format)
+        sigil_img = self.sigil.getImage(shortened_format=use_shortened_format, config=config, color_map=color_map)
         if sigil_img.height < config["gemification_sigil_small_max_height"]:
-            patch_image = get_card_asset("sigil", "extras/gemification", temple, tier, bg_modifier)
+            patch_image = get_card_asset("sigil", "extras/gemification", temple, tier, bg_modifier, config["default_tier"])
         elif sigil_img.height < config["gemification_sigil_medium_max_height"]:
-            patch_image = get_card_asset("sigil3", "extras/gemification", temple, tier, bg_modifier)
+            patch_image = get_card_asset("sigil3", "extras/gemification", temple, tier, bg_modifier, config["default_tier"])
         else:
-            patch_image = get_card_asset("sigil4", "extras/gemification", temple, tier, bg_modifier)
+            patch_image = get_card_asset("sigil4", "extras/gemification", temple, tier, bg_modifier, config["default_tier"])
         
         if "prism" in self.gems:
             gem_file = "prism"
@@ -552,7 +732,7 @@ class GemifyConditional(SigilConditional):
             gem_file = "_".join([g for g in ["green", "orange", "blue"] if g in self.gems])
         if "_" in gem_file:
             gem_file = "sigil_" + gem_file
-        gem_image = get_card_asset(gem_file, "extras/gemification", temple, tier, bg_modifier)
+        gem_image = get_card_asset(gem_file, "extras/gemification", temple, tier, bg_modifier, config["default_tier"])
         
         gem_x = config['gemification_sigil_gems_right_border'] - gem_image.width
         gem_y = (patch_image.height - gem_image.height) // 2
@@ -582,13 +762,14 @@ class ArcaneConditional(SigilConditional):
         )
 
     def getImage(self, config, color_map, temple, tier, bg_modifier, use_shortened_format=False):
-        patch_image = get_card_asset("arcane", "extras/conditionals", temple, tier, bg_modifier)
+        patch_image = get_card_asset("arcane", "extras/conditionals", temple, tier, bg_modifier, config["default_tier"])
         draw = ImageDraw.Draw(patch_image)
-        font = ImageFont.truetype(FONT, config["arcane_font_size"])
+        font = ImageFont.truetype(_font_path(config), config["arcane_font_size"])
         text = config["arcane_text"]
-        text_x = (patch_image.width - draw.textlength(text, font=font)) // 2
-        draw.text((text_x-1, config["arcane_text_y"] + 3), text, fill=color_map["arcane_light_color"], font=font)
-        draw.text((text_x+1, config["arcane_text_y"]), text, fill=color_map["arcane_dark_color"], font=font)
+        text_width = measure_rich_text(text, font, color_map["arcane_light_color"], color_map, config)
+        text_x = (patch_image.width - text_width) // 2
+        draw_rich_text(patch_image, text, font, (text_x - 1, config["arcane_text_y"] + 3), color_map["arcane_light_color"], color_map, config)
+        draw_rich_text(patch_image, text, font, (text_x + 1, config["arcane_text_y"]), color_map["arcane_dark_color"], color_map, config)
         return patch_image
 
     @classmethod
@@ -607,13 +788,14 @@ class TribalConditional(SigilConditional):
         )
 
     def getImage(self, config, color_map, temple, tier, bg_modifier, use_shortened_format=False):
-        patch_image = get_card_asset("tribal", "extras/conditionals", temple, tier, bg_modifier)
+        patch_image = get_card_asset("tribal", "extras/conditionals", temple, tier, bg_modifier, config["default_tier"])
         draw = ImageDraw.Draw(patch_image)
-        font = ImageFont.truetype(FONT, config["tribal_font_size"])
+        font = ImageFont.truetype(_font_path(config), config["tribal_font_size"])
         text = config["tribal_text"]
-        text_x = (patch_image.width - draw.textlength(text, font=font)) // 2
-        draw.text((text_x-1, config["tribal_text_y"] + 3), text, fill=color_map["tribal_light_color"], font=font)
-        draw.text((text_x+1, config["tribal_text_y"]), text, fill=color_map["tribal_dark_color"], font=font)
+        text_width = measure_rich_text(text, font, color_map["tribal_light_color"], color_map, config)
+        text_x = (patch_image.width - text_width) // 2
+        draw_rich_text(patch_image, text, font, (text_x - 1, config["tribal_text_y"] + 3), color_map["tribal_light_color"], color_map, config)
+        draw_rich_text(patch_image, text, font, (text_x + 1, config["tribal_text_y"]), color_map["tribal_dark_color"], color_map, config)
         return patch_image
 
     @classmethod
@@ -623,9 +805,7 @@ class TribalConditional(SigilConditional):
         return None
 
 
-def create_card(csv_dict):
-    global TEMPLES, FONT
-
+def create_card(csv_dict, config_override=None):
     # Parse the tags
     raw_tags = csv_dict.get('Tags', '')
     tags = [t.strip().lower() for t in raw_tags.split(',')] if raw_tags not in ['None', ''] else []
@@ -638,18 +818,19 @@ def create_card(csv_dict):
             break
 
     # Pass the modifier to config, color map, and image loaders
-    config = load_config(csv_dict['Temple'], csv_dict['Tier'], bg_modifier)
-    color_map = get_color_mapping(csv_dict['Temple'], csv_dict['Tier'], bg_modifier)
+    config = config_override or load_config(csv_dict['Temple'], csv_dict['Tier'], bg_modifier)
+    color_map = get_color_mapping(csv_dict['Temple'], csv_dict['Tier'], bg_modifier, config)
     
     # Get sigil and trait list
     sigil_list, trait_list, power_sigil, health_sigil, conduit_sigil, mox_provided = get_sigil_data(config, csv_dict)
 
     # Get cardback
-    image = get_cardback(csv_dict['Temple'], csv_dict['Tier'], bg_modifier)
+    image = get_cardback(csv_dict['Temple'], csv_dict['Tier'], bg_modifier, config["default_tier"])
 
     # Add gemification indicator if needed
-    if "gemified_vanila" in csv_dict['Tags']:
-        vanilla_gemification = get_vanilla_gemification(csv_dict['Temple'], csv_dict['Tier'], bg_modifier)
+    card_tags = tag_values(raw_tags)
+    if "gemified_vanilla" in card_tags:
+        vanilla_gemification = get_vanilla_gemification(csv_dict['Temple'], csv_dict['Tier'], bg_modifier, config["default_tier"])
         image.paste(vanilla_gemification, (0, 0), vanilla_gemification)
 
     # Add the art
@@ -676,12 +857,15 @@ def create_card(csv_dict):
     # Add tribe icons
     print_tribes(config, image, csv_dict, bg_modifier)
 
+    # Add symbols
+    image = print_symbols(config, image, csv_dict, bg_modifier)
+
     # TODO: Temple/rarity-based values
     draw = ImageDraw.Draw(image)
     # Write the name
-    write_name(config, image, draw, csv_dict)
-    # Write the flavor text
-    write_flavor_text(config, color_map, image, draw, csv_dict, need_displacement)
+    write_name(config, color_map, image, draw, csv_dict)
+    # Write the flavor text and get the top border for sigils
+    sigil_y = write_flavor_text(config, color_map, image, draw, csv_dict, need_displacement)
     # Write the metadata
     if config['write_card_metadata']:
         write_metadata(config, color_map, image, draw, csv_dict)
@@ -690,22 +874,29 @@ def create_card(csv_dict):
         write_art_credit(config, color_map, image, draw, csv_dict)
 
     # If a tag calls for it, add a null conduit sigil indicator
-    if not conduit_sigil and "conduit_sigil_indicator" in csv_dict["Tags"]:
+    if not conduit_sigil and "conduit_sigil_indicator" in card_tags:
         conduit_sigil = "NullConduit"
-
-    success = False
-    sigil_y = config['sigil_top_border'] + (config['indicator_displacement'] if need_displacement else 0)
 
     # Print the sigil conduit indicator
     if config['show_conduit_sigil_indicators'] and conduit_sigil:
+        conduit_img_path = GENERAL_ASSETS_DIR / "conduit_sigil_indicators" / f"{conduit_sigil}.png"
         try:
-            conduit_img = Image.open(f"assets/general_assets/conduit_sigil_indicators/{conduit_sigil}.png")
+            conduit_img = Image.open(conduit_img_path)
             conduit_x = (image.width - conduit_img.width) // 2
             image = paste_sigil(image, conduit_img, (conduit_x, sigil_y - config['sigil_vertical_spacing']))
             sigil_y += conduit_img.height
         except (FileNotFoundError, PermissionError):
-            logging.warning(f'Warning: Conduit sigil indicator "assets/general_assets/conduit_sigil_indicators/{conduit_sigil}.png" not found.')
+            logging.warning(f'Warning: Conduit sigil indicator "{conduit_img_path}" not found.')
+            try:
+                conduit_img_path = GENERAL_ASSETS_DIR / "conduit_sigil_indicators" / "NullConduit.png"
+                conduit_img = Image.open(conduit_img_path)
+                conduit_x = (image.width - conduit_img.width) // 2
+                image = paste_sigil(image, conduit_img, (conduit_x, sigil_y - config['sigil_vertical_spacing']))
+                sigil_y += conduit_img.height
+            except (FileNotFoundError, PermissionError):
+                pass
 
+    success = False
     # Try default formatting
     if config['allow_default_formatting']:
         image_default = print_card_sigils_and_traits(config, color_map, bg_modifier, image, sigil_y, csv_dict, sigil_list, trait_list, use_shortened_format=False)
@@ -726,13 +917,13 @@ def create_card(csv_dict):
             success = True
     # If no formatting method worked, raise an error
     if not success:
-        raise Exception(f"Could not fit sigils and traits on card {csv_dict['Card Name']} with any formatting option.")
+        raise RuntimeError(f"Could not fit sigils and traits on card {csv_dict['Card Name']} with any formatting option.")
 
     # Write the stats
-    image = write_stats(config, image, csv_dict, power_sigil, health_sigil, bg_modifier)
+    image = write_stats(config, color_map, image, csv_dict, power_sigil, health_sigil, bg_modifier)
 
     # Write stat gemification text if needed
     draw = ImageDraw.Draw(image)
-    write_stat_gemification_text(config, image, draw, csv_dict)
+    write_stat_gemification_text(config, color_map, image, draw, csv_dict)
 
     return image
