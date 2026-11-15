@@ -99,7 +99,7 @@ class SigilTraitEditor(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._build_header())
 
-        order_box = QGroupBox("Item order")
+        order_box = QGroupBox("Sigil/Trait list")
         order_layout = QVBoxLayout(order_box)
         self.order_list = QListWidget()
         self.order_list.setDragDropMode(QAbstractItemView.InternalMove)
@@ -109,6 +109,7 @@ class SigilTraitEditor(QWidget):
         self.order_list.setSelectionMode(QAbstractItemView.SingleSelection)
         self.order_list.setToolTip("Drag items to change their order in the current CSV file.")
         self.order_list.model().rowsMoved.connect(self._order_list_moved)
+        self.order_list.itemDoubleClicked.connect(lambda _item: self._load_order_selection())
         order_layout.addWidget(self.order_list, 1)
 
         order_actions = QHBoxLayout()
