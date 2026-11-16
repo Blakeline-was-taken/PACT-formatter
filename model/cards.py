@@ -131,13 +131,13 @@ def get_traitline_image(temple, tier, bg_modifier, fallback_tier=None):
 
 
 def get_card_art(art_filename, temple, bg_modifier):
-    art_path = GENERAL_ASSETS_DIR / "card_art " / art_filename
+    art_path = GENERAL_ASSETS_DIR / "card_art" / art_filename
     try:
         art = Image.open(art_path)
         return apply_temple_colors(art, temple, bg_modifier)
     except (FileNotFoundError, PermissionError) as error:
         logging.warning("Card art %s for temple %r is unavailable; using the placeholder: %s", art_path, temple, error)
-        return Image.open(GENERAL_ASSETS_DIR / "card_art " / "_placeholder_.png")
+        return Image.open(GENERAL_ASSETS_DIR / "card_art" / "_placeholder_.png")
 
 
 def get_sigil_data(config, csv_dict):
