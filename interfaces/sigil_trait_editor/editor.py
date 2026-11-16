@@ -1,6 +1,7 @@
 """Qt interface for editing and previewing sigils and traits."""
 
 import csv
+import logging
 import shutil
 from pathlib import Path
 
@@ -39,15 +40,11 @@ from ..gui_helpers import (
     safe_filename,
     set_widget_tooltip,
 )
-from .data import (
-    CONDUIT_SIGIL_ICON_DIR,
-    SIGIL_ICON_DIR,
-    SigilTraitRepository,
-    normalize_sigil_name,
-)
+from .data import CONDUIT_SIGIL_ICON_DIR, SIGIL_ICON_DIR, SigilTraitRepository, normalize_sigil_name
 from ..tag_data import SIGIL_TRAIT_TAG_OPTIONS
 from ..card_editor.fields import TagList
 from ..sorting import SortDialog, sort_records
+from ..error_handling import exception_details, log_exception, show_error
 
 class SigilTraitEditor(QWidget):
     """Search, edit, preview, and save sigils and traits from their shared CSV files."""
@@ -381,7 +378,7 @@ class SigilTraitEditor(QWidget):
         try:
             self.repository.save_items(self.data)
         except (OSError, csv.Error) as error:
-            QMessageBox.critical(self, "Could not save item order", str(error))
+            show_error(self, "Could not save item order", f"Could not save the {self.current_section.lower()} data file order.", error)
             return
         self._refresh_order_list()
         QMessageBox.information(self, "Item order saved", f"The {self.current_section.lower()} order was saved.")
@@ -585,9 +582,14 @@ class SigilTraitEditor(QWidget):
             image = create_card_preview(sigils=row["Sigils"], traits=row["Traits"], tags=card_tags)
             pixmap = self._pixmap_for(image)
             self.preview.set_source_pixmap(pixmap)
+            self.preview.setToolTip("Live card preview showing this item in a sample card.")
         except Exception as error:
+            item_name = self.name_edit.text().strip() or "(unnamed item)"
+            context = f"Could not render the preview for {self.current_section[:-1].lower()} {item_name!r}."
+            summary = log_exception(context, error)
             self.preview.clear()
-            self.preview.setText(f"Preview unavailable: {error}")
+            self.preview.setText(f"Preview unavailable for {item_name}.\n{summary}")
+            self.preview.setToolTip(exception_details(error))
 
     @staticmethod
     def _pixmap_for(image):
@@ -635,8 +637,12 @@ class SigilTraitEditor(QWidget):
             )
             if result != QMessageBox.Yes:
                 return
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, target)
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+        except OSError as error:
+            show_error(self, "Could not copy icon", f"Could not copy {source} to {target}.", error)
+            return
         icon_to_edit.setText(str(target.name))
         self._render_preview()
 
@@ -664,7 +670,7 @@ class SigilTraitEditor(QWidget):
             try:
                 target.unlink()
             except OSError as error:
-                QMessageBox.warning(self, "Error", f"Could not delete icon: {error}")
+                show_error(self, "Could not delete icon", f"Could not delete icon file {target}.", error)
                 return
             self.colorless_icon_edit.setText("")
             self._render_preview()
@@ -709,10 +715,18 @@ class SigilTraitEditor(QWidget):
                 QMessageBox.No,
             )
             if prompt == QMessageBox.Yes:
-                self._update_cards_for_type_change(old_name, name, source_section, target_section)
+                try:
+                    self._update_cards_for_type_change(old_name, name, source_section, target_section)
+                except (OSError, csv.Error) as error:
+                    show_error(self, "Could not update related cards", f"Could not update references to {old_name!r} in {self.repository.cards_path}.", error)
+                    return False
 
         # Persist once confirmations and any related-card updates are complete.
-        self.data = self.repository.write_item(self.data, old_name, name, data, target_section)
+        try:
+            self.data = self.repository.write_item(self.data, old_name, name, data, target_section)
+        except (OSError, csv.Error) as error:
+            show_error(self, "Could not save item", f"Could not save {target_type.lower()} {name!r} to the item data files.", error)
+            return False
         self.current_name = name
         self.original = dict(data)
         self.original["Type"] = target_type
@@ -724,15 +738,19 @@ class SigilTraitEditor(QWidget):
 
         # Export the matching renderer model after saving the CSV definition.
         if export:
-            if target_type == "Sigil":
-                img = sigils.SIGILS[self.current_name].getImage(config=DEFAULT_CONFIG, color_map=sigils.get_color_mapping("default"))
-                export_dir = ROOT / "exports" / "sigils"
-            else:
-                img = sigils.TRAITS[self.current_name].getImage(config=DEFAULT_CONFIG, color_map=sigils.get_color_mapping("default"))
-                export_dir = ROOT / "exports" / "traits"
-            export_dir.mkdir(parents=True, exist_ok=True)
-            target = export_dir / f"{safe_filename(name)}.png"
-            img.save(target)
+            try:
+                if target_type == "Sigil":
+                    img = sigils.SIGILS[self.current_name].getImage(config=DEFAULT_CONFIG, color_map=sigils.get_color_mapping("default"))
+                    export_dir = ROOT / "exports" / "sigils"
+                else:
+                    img = sigils.TRAITS[self.current_name].getImage(config=DEFAULT_CONFIG, color_map=sigils.get_color_mapping("default"))
+                    export_dir = ROOT / "exports" / "traits"
+                export_dir.mkdir(parents=True, exist_ok=True)
+                target = export_dir / f"{safe_filename(name)}.png"
+                img.save(target)
+            except Exception as error:
+                show_error(self, "Item export failed", f"Could not render or save {target_type.lower()} {name!r} to {ROOT / 'exports'}.", error)
+                return False
             QMessageBox.information(self, "Exported", f"{name} was exported to {target}.")
         return True
 
@@ -757,8 +775,12 @@ class SigilTraitEditor(QWidget):
         if result != QMessageBox.Yes:
             return
 
-        self.data = self.repository.delete_item(self.data, self.current_section, self.current_name)
         item_name = self.current_name
+        try:
+            self.data = self.repository.delete_item(self.data, self.current_section, item_name)
+        except (OSError, csv.Error) as error:
+            show_error(self, "Could not delete item", f"Could not remove {item_name!r} from the {self.current_section.lower()} data files.", error)
+            return
         if self.current_section == "Sigils":
             export_dirs = (
                 ("sigils", f"{item_name}.png"),
@@ -768,7 +790,7 @@ class SigilTraitEditor(QWidget):
                 ("sigil icons", f"{item_name}.png"),
             )
         else:
-            export_dirs = ("traits", f"{item_name}.png")
+            export_dirs = (("traits", f"{item_name}.png"),)
         delete_exports = QMessageBox.question(
             self,
             "Delete exports?",
@@ -787,7 +809,13 @@ class SigilTraitEditor(QWidget):
                 except OSError as error:
                     failures.append(f"{target}: {error}")
             if failures:
-                QMessageBox.warning(self, "Could not delete all exports", "\n".join(failures))
+                for failure in failures:
+                    logging.getLogger("pact").error("Could not delete export: %s", failure)
+                QMessageBox.warning(
+                    self,
+                    "Could not delete all exports",
+                    "Some export files could not be deleted. See error.log for details.\n\n" + "\n".join(failures),
+                )
         self.current_name = ""
         self._refresh_search()
         self._refresh_order_list()

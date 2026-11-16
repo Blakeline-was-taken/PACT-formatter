@@ -1,6 +1,7 @@
 """Sigil, trait, and card-reference persistence."""
 
 import csv
+import logging
 
 from model import DEFAULT_CONFIG
 from ..gui_helpers import ROOT, _join, _split
@@ -21,6 +22,7 @@ def _csv_rows(path):
         with path.open("r", newline="", encoding="utf-8") as handle:
             return [dict(row) for row in csv.DictReader(handle)]
     except (OSError, csv.Error):
+        logging.getLogger("pact").exception("Could not load item data from %s.", path)
         return []
 
 
@@ -77,11 +79,8 @@ class SigilTraitRepository:
 
     def update_card_references(self, old_name, new_name, source_section, target_section):
         """Move matching card references when an item changes between types."""
-        try:
-            with self.cards_path.open("r", newline="", encoding="utf-8") as handle:
-                rows = list(csv.DictReader(handle))
-        except (OSError, csv.Error):
-            return
+        with self.cards_path.open("r", newline="", encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle))
 
         source_field = "Sigils" if source_section == "Sigils" else "Traits"
         target_field = "Sigils" if target_section == "Sigils" else "Traits"

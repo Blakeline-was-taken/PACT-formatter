@@ -44,6 +44,7 @@ from .data import (
 from .fields import CostList, ElementList, SigilList, TagList
 from ..gui_helpers import AspectRatioPixmapLabel, Gemification, NoWheelComboBox, ROOT, _split, _join, set_widget_tooltip
 from ..sorting import SortDialog, sort_records
+from ..error_handling import exception_details, log_exception, show_error
 
 class CardEditor(QWidget):
     """Search, edit, preview, save, export, and delete card records."""
@@ -85,7 +86,7 @@ class CardEditor(QWidget):
         try:
             self.fieldnames, self.rows = self.repository.load_cards()
         except (OSError, csv.Error) as error:
-            QMessageBox.critical(self, "Could not load cards", str(error))
+            show_error(self, "Could not load cards", f"Could not read the card data file at {self.repository.cards_path}.", error)
 
     def _load_models(self):
         """Populate renderer lookup tables used by card preview rendering."""
@@ -94,7 +95,8 @@ class CardEditor(QWidget):
                 with (ROOT / "data" / filename).open(newline="", encoding="utf-8") as handle:
                     for row in csv.DictReader(handle):
                         loader(row)
-            except (OSError, csv.Error):
+            except (OSError, csv.Error) as error:
+                show_error(self, "Could not load renderer data", f"Could not load {filename}; definitions from this file will be unavailable.", error)
                 continue
 
     def _build_ui(self):
@@ -528,7 +530,7 @@ class CardEditor(QWidget):
         try:
             self.repository.save_cards(self.rows, self.fieldnames)
         except (OSError, csv.Error) as error:
-            QMessageBox.critical(self, "Could not save card order", str(error))
+            show_error(self, "Could not save card order", f"Could not write the card order to {self.repository.cards_path}.", error)
             return
         self._refresh_order_list()
         QMessageBox.information(self, "Card order saved", "The card order was saved to cards.csv.")
@@ -637,9 +639,14 @@ class CardEditor(QWidget):
             image = cards.create_card(row)
             pixmap = QPixmap.fromImage(ImageQt(image))
             self.preview.set_source_pixmap(pixmap)
+            self.preview.setToolTip("Live card preview. Changes appear here before you save or export.")
         except Exception as error:
+            card_name = row.get("Card Name") or "(unnamed card)"
+            context = f"Could not render the preview for card {card_name!r} (temple={row.get('Temple') or '(blank)'!r}, tier={row.get('Tier') or '(blank)'!r})."
+            summary = log_exception(context, error)
             self.preview.clear()
-            self.preview.setText(f"Preview unavailable: {error}")
+            self.preview.setText(f"Preview unavailable for {card_name}.\n{summary}")
+            self.preview.setToolTip(exception_details(error))
 
     def resizeEvent(self, event):
         """Keep the form body exactly as wide as the scroll viewport."""
@@ -698,14 +705,18 @@ class CardEditor(QWidget):
             QMessageBox.warning(self, "Cannot save card", "Card Name is required.")
             return False
         source = Path(row["Art File"])
-        if source.is_file() and source.parent.resolve() != ASSET_PATH.resolve():
-            ASSET_PATH.mkdir(parents=True, exist_ok=True)
-            target = ASSET_PATH / source.name
-            shutil.copy2(source, target)
-            row["Art File"] = target.name
-            self.art.setText(target.name)
-        elif source.name:
-            row["Art File"] = source.name
+        try:
+            if source.is_file() and source.parent.resolve() != ASSET_PATH.resolve():
+                ASSET_PATH.mkdir(parents=True, exist_ok=True)
+                target = ASSET_PATH / source.name
+                shutil.copy2(source, target)
+                row["Art File"] = target.name
+                self.art.setText(target.name)
+            elif source.name:
+                row["Art File"] = source.name
+        except OSError as error:
+            show_error(self, "Could not copy card art", f"Could not copy card art {source} into {ASSET_PATH}.", error)
+            return False
         if self.current_index < 0:
             self.rows.append(row)
             self.current_index = len(self.rows) - 1
@@ -715,7 +726,7 @@ class CardEditor(QWidget):
             self.repository.save_cards(self.rows, self.fieldnames)
         except (OSError, csv.Error) as error:
             self._refresh_order_list(row)
-            QMessageBox.critical(self, "Could not save cards", str(error))
+            show_error(self, "Could not save cards", f"Could not write the card data file at {self.repository.cards_path}.", error)
             return False
         self.original = dict(row)
         self._refresh_search(row["Card Name"])
@@ -729,7 +740,7 @@ class CardEditor(QWidget):
                 target.parent.mkdir(parents=True, exist_ok=True)
                 image.save(target)
             except Exception as error:
-                QMessageBox.critical(self, "Export failed", str(error))
+                show_error(self, "Card export failed", f"Could not render or save card {row['Card Name']!r} to {target if 'target' in locals() else ROOT / 'exports'}.", error)
                 return False
             QMessageBox.information(self, "Card exported", f"{row['Card Name']} was exported to {target}.")
         self._render_preview()
@@ -759,13 +770,22 @@ class CardEditor(QWidget):
         )
         if delete_exports == QMessageBox.Yes:
             for candidate in (exports / f"{row['Card Name']}.png", exports / f"{row['Art File']}.png"):
-                if candidate.is_file():
-                    candidate.unlink()
-        self._save_rows()
+                try:
+                    if candidate.is_file():
+                        candidate.unlink()
+                except OSError as error:
+                    show_error(self, "Could not delete card export", f"Could not delete export file {candidate}.", error)
+        if not self._save_rows():
+            return
         self._refresh_search("")
         self._select_index(min(self.current_index, len(self.rows) - 1))
 
     def _save_rows(self):
         """Persist the in-memory card list using the original CSV columns."""
-        self.repository.save_cards(self.rows, self.fieldnames)
+        try:
+            self.repository.save_cards(self.rows, self.fieldnames)
+        except (OSError, csv.Error) as error:
+            show_error(self, "Could not save cards", f"Could not write the card data file at {self.repository.cards_path}.", error)
+            return False
         self._refresh_order_list()
+        return True

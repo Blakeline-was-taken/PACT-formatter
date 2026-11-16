@@ -1,6 +1,7 @@
 """Tabbed graphical editor shell for the PACT formatter."""
 
 import sys
+from pathlib import Path
 
 from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QFont
@@ -9,6 +10,8 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QTabWidget,
 )
+
+from .error_handling import configure_logging, install_exception_hook, show_error
 
 
 class EditorWindow(QMainWindow):
@@ -186,6 +189,18 @@ def run():
     """Create and display the GUI, then enter Qt's event loop."""
     app = QApplication.instance() or QApplication(sys.argv)
     _apply_style(app)
-    window = EditorWindow()
+    log_path = Path(__file__).resolve().parent.parent / "error.log"
+    try:
+        configure_logging(log_path)
+    except OSError as error:
+        show_error(None, "Could not initialize error logging", f"Could not open the application log file at {log_path}.", error)
+        return 1
+    window = None
+    install_exception_hook(lambda: window)
+    try:
+        window = EditorWindow()
+    except Exception as error:
+        show_error(None, "Could not start PACT Formatter", "The formatter window could not be initialized.", error)
+        return 1
     window.show()
     return app.exec()

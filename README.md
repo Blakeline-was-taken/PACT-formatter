@@ -109,6 +109,10 @@ The legacy command-line exporter remains available:
 python main.py --cli
 ```
 
+### GUI Error Details
+
+The GUI writes warnings and errors to `error.log` in the project folder. Error dialogs include the operation and relevant file or item context. Expand **Details** to view the traceback. Preview errors are shown in the preview pane, with the full traceback available in its tooltip and in the log.
+
 When using the CLI, select the asset type when prompted:
 
 * `1` for Cards

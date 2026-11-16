@@ -1,4 +1,5 @@
 import re
+import logging
 from model import GENERAL_ASSETS_DIR, Image, ImageDraw
 
 
@@ -82,10 +83,11 @@ def load_icon(markup, color, icon_height):
 
     try:
         icon = Image.open(icon_path).convert("RGBA")
-    except FileNotFoundError:
+    except FileNotFoundError as error:
         fallback_path = GENERAL_ASSETS_DIR / "sigils" / "X_outline.png"
         if not fallback_path.exists():
             fallback_path = GENERAL_ASSETS_DIR / "sigils" / "X.png"
+        logging.getLogger("pact").warning("Rich-text icon %s is missing; using fallback %s: %s", icon_path, fallback_path, error)
         icon = Image.open(fallback_path).convert("RGBA")
 
     icon_width = max(1, round(icon.width * icon_height / icon.height))

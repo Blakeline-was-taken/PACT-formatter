@@ -1,5 +1,8 @@
 """Reusable Qt controls and result-grid components for export."""
 
+import logging
+import traceback
+
 from PySide6.QtCore import QAbstractListModel, QModelIndex, QRect, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QIcon, QImage, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
@@ -187,7 +190,7 @@ class DragSelectListWidget(QListWidget):
 class ExportResultsModel(QAbstractListModel):
     """Lightweight filtered item model with lazily loaded thumbnail icons."""
 
-    previewFailed = Signal(str, str)
+    previewFailed = Signal(str, str, str)
     ITEM_KEY_ROLE = Qt.UserRole + 1
     SELECTED_ROLE = Qt.UserRole + 2
 
@@ -275,8 +278,11 @@ class ExportResultsModel(QAbstractListModel):
                     self.icons[key] = QIcon(pixmap)
                 except Exception as error:
                     item_name = row.get("Card Name", row.get("Name", "Item"))
+                    context = f"Could not render {self.item_type.lower()} preview for {item_name!r}"
+                    details = "".join(traceback.format_exception(type(error), error, error.__traceback__)).strip()
+                    logging.getLogger("pact").error("%s: %s", context, error, exc_info=(type(error), error, error.__traceback__))
                     self.icons[key] = QIcon()
-                    self.previewFailed.emit(item_name, str(error) or type(error).__name__)
+                    self.previewFailed.emit(item_name, f"{type(error).__name__}: {error}", details)
 
             elif self.item_type == "Cards":
                 art_path = ASSET_PATH / (row.get("Art File") or "")

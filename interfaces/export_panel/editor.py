@@ -1,6 +1,7 @@
 """Filter, select, and bulk-export cards, sigils, and traits."""
 
 import csv
+import logging
 from pathlib import Path
 
 from PySide6.QtCore import QSize, QSettings, Qt, QTimer
@@ -44,6 +45,7 @@ from .data import (
     unique as _unique,
 )
 from .service import ExportJob
+from ..error_handling import show_error
 from .widgets import (
     CARD_PREVIEW_SIZE,
     PATCH_PREVIEW_SIZE,
@@ -70,7 +72,7 @@ class ExportPanel(QWidget):
             self.sigils = _load_csv(SIGIL_PATH)
             self.traits = _load_csv(TRAIT_PATH)
         except (OSError, UnicodeError, csv.Error) as error:
-            QMessageBox.critical(self, "Could not load export data", str(error))
+            show_error(self, "Could not load export data", "Could not read the cards, sigils, or traits CSV files required by the export panel.", error)
             self.cards, self.sigils, self.traits = [], [], []
         for row in self.sigils:
             sigils.add_sigil(row)
@@ -332,8 +334,9 @@ class ExportPanel(QWidget):
         self.preview_error_label.hide()
         self._preview_options_changed()
 
-    def _preview_failed(self, item_name, error):
-        self.preview_error_label.setText(f"Could not preview {item_name}: {error}")
+    def _preview_failed(self, item_name, error, details):
+        self.preview_error_label.setText(f"Could not preview {item_name}.\n{error}")
+        self.preview_error_label.setToolTip(details)
         self.preview_error_label.show()
 
     def _filter_box(self, title):
@@ -747,14 +750,27 @@ class ExportPanel(QWidget):
             options["all_card_rows"] = self.cards
         output_dir = Path(self.output_edit.text())
         self._active_output_dir = output_dir
-        job = ExportJob(rows, self.item_type, options, output_dir, self)
-        job.progress.connect(self._update_export_progress)
-        job.message.connect(self._show_export_message)
-        job.finished.connect(self._export_finished)
-        job.finished.connect(lambda target=job: self._export_jobs.remove(target) if target in self._export_jobs else None)
-        self._export_jobs.append(job)
-        progress.show()
-        job.start()
+        try:
+            job = ExportJob(rows, self.item_type, options, output_dir, self)
+            job.progress.connect(self._update_export_progress)
+            job.message.connect(self._show_export_message)
+            job.finished.connect(self._export_finished)
+            job.finished.connect(lambda target=job: self._export_jobs.remove(target) if target in self._export_jobs else None)
+            self._export_jobs.append(job)
+            progress.show()
+            job.start()
+        except Exception as error:
+            self.export_button.setEnabled(True)
+            self.export_button.setText("Export")
+            self.type_combo.setEnabled(True)
+            self.output_browse_button.setEnabled(True)
+            self._progress_dialog = None
+            if "job" in locals() and job in self._export_jobs:
+                self._export_jobs.remove(job)
+            progress.allow_close = True
+            progress.close()
+            progress.deleteLater()
+            show_error(self, "Could not start export", f"Could not start exporting {self.item_type.lower()} to {output_dir}.", error)
 
     def _update_export_progress(self, completed, total, item_name):
         if self._progress_dialog is None:
@@ -794,6 +810,7 @@ class ExportPanel(QWidget):
                 QMessageBox.No,
             )
             if answer == QMessageBox.Yes and not open_folder(output_dir):
+                logging.getLogger("pact").warning("Could not open export folder %s.", output_dir)
                 QMessageBox.warning(self, "Could not open folder", f"Could not open the export folder:\n{output_dir}")
 
     def closeEvent(self, event):
