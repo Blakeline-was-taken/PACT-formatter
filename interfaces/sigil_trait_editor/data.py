@@ -1,7 +1,9 @@
 """Sigil, trait, and card-reference persistence."""
 
 import csv
-import logging
+import os
+import tempfile
+from pathlib import Path
 
 from model import DEFAULT_CONFIG
 from ..gui_helpers import ROOT, _join, _split
@@ -17,13 +19,16 @@ def normalize_sigil_name(name):
 
 
 def _csv_rows(path):
-    """Load item rows from a CSV, returning an empty list when unavailable."""
-    try:
-        with path.open("r", newline="", encoding="utf-8") as handle:
-            return [dict(row) for row in csv.DictReader(handle)]
-    except (OSError, csv.Error):
-        logging.getLogger("pact").exception("Could not load item data from %s.", path)
-        return []
+    """Load item rows from a CSV with the required item columns."""
+    with path.open("r", newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        if reader.fieldnames is None:
+            raise csv.Error(f"{path} has no CSV header")
+        missing_fields = {"Name", "Description", "Tags"} - set(reader.fieldnames)
+        if missing_fields:
+            missing = ", ".join(sorted(missing_fields))
+            raise csv.Error(f"{path} is missing required CSV columns: {missing}")
+        return [dict(row) for row in reader]
 
 
 class SigilTraitRepository:
@@ -70,12 +75,25 @@ class SigilTraitRepository:
         return updated
 
     def save_items(self, data):
-        """Write each section using the shared item CSV columns."""
-        for section, path in self.paths.items():
-            with path.open("w", newline="", encoding="utf-8") as handle:
-                writer = csv.DictWriter(handle, fieldnames=["Name", "Description", "Tags"])
-                writer.writeheader()
-                writer.writerows(data.get(section, []))
+        """Atomically replace each section using the shared item CSV columns."""
+        temporary_paths = {}
+        try:
+            for section, path in self.paths.items():
+                with tempfile.NamedTemporaryFile(mode="w", newline="", encoding="utf-8", dir=path.parent, delete=False) as handle:
+                    temporary_path = Path(handle.name)
+                    temporary_paths[temporary_path] = path
+                    writer = csv.DictWriter(handle, fieldnames=["Name", "Description", "Tags"])
+                    writer.writeheader()
+                    writer.writerows(data[section])
+
+            for temporary_path, path in temporary_paths.items():
+                os.replace(temporary_path, path)
+        finally:
+            for temporary_path in temporary_paths:
+                try:
+                    temporary_path.unlink()
+                except FileNotFoundError:
+                    pass
 
     def update_card_references(self, old_name, new_name, source_section, target_section):
         """Move matching card references when an item changes between types."""

@@ -81,7 +81,8 @@ class ExportPanel(QWidget):
         self.effect_tags_by_name = {}
         for row in self.sigils + self.traits:
             name = _display_name(row.get("Name", "")).casefold()
-            self.effect_tags_by_name.setdefault(name, set()).update(tag.strip().casefold() for tag in row.get("Tags", "").split(",") if tag.strip())
+            tags = (row.get("Tags") or "").split(",")
+            self.effect_tags_by_name.setdefault(name, set()).update(tag.strip().casefold() for tag in tags if tag.strip())
         self.item_type = "Cards"
         self.settings = QSettings("Blakeline-was-taken", "PACT Formatter")
         default_output_dir = str(ROOT / "exports")
